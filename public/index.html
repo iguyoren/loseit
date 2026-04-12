@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LoseIt — ניהול משקל</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">⚖️ <span>LoseIt</span></div>
+    <nav class="desktop-nav">
+      <button class="nav-btn active" data-view="dashboard">🏠 דשבורד</button>
+      <button class="nav-btn" data-view="calendar">📅 לוח שנה</button>
+      <button class="nav-btn" data-view="history">📋 היסטוריה</button>
+    </nav>
+  </div>
+</header>
+
+<!-- Mobile bottom navigation -->
+<nav class="mobile-nav">
+  <button class="mob-nav-btn active" data-view="dashboard">
+    <span class="mob-icon">🏠</span>
+    <span class="mob-label">דשבורד</span>
+  </button>
+  <button class="mob-nav-btn" data-view="calendar">
+    <span class="mob-icon">📅</span>
+    <span class="mob-label">לוח שנה</span>
+  </button>
+  <button class="mob-nav-btn" data-view="history">
+    <span class="mob-icon">📋</span>
+    <span class="mob-label">היסטוריה</span>
+  </button>
+</nav>
+
+<main>
+
+  <!-- ═══ DASHBOARD ═══ -->
+  <div id="view-dashboard" class="view active">
+
+    <!-- User switcher -->
+    <div id="userSwitcher" class="user-switcher"></div>
+
+    <!-- Stats -->
+    <section id="stats-section">
+      <div id="stats-cards"></div>
+    </section>
+
+    <!-- Chart -->
+    <section class="card chart-card">
+      <div class="card-header">
+        <h2>📈 גרף משקל</h2>
+        <div class="period-btns">
+          <button class="btn-period active" data-days="0">החודש</button>
+          <button class="btn-period" data-days="90">3 חודשים</button>
+          <button class="btn-period" data-days="365">שנה</button>
+        </div>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="weightChart"></canvas>
+        <div id="workoutRow" class="workout-row"></div>
+      </div>
+    </section>
+
+    <!-- Manual entry -->
+    <section class="card">
+      <div class="card-header"><h2>✏️ הוספה ידנית</h2></div>
+      <form id="manualForm" class="manual-form">
+        <select id="entryUser" required></select>
+        <input type="number" id="entryWeight" placeholder='משקל (ק"ג)' step="0.1" min="30" max="300" required />
+        <input type="text" id="entryNote" placeholder="הערה (אופציונלי)" />
+        <button type="submit" class="btn-primary">הוסף</button>
+      </form>
+    </section>
+
+  </div>
+
+  <!-- ═══ CALENDAR ═══ -->
+  <div id="view-calendar" class="view">
+    <div class="calendar-toolbar">
+      <div id="calUserSwitcher" class="user-switcher small"></div>
+      <div class="cal-nav">
+        <button id="calPrev">‹</button>
+        <span id="calTitle"></span>
+        <button id="calNext">›</button>
+      </div>
+    </div>
+    <div id="summaryCards" class="summary-cards"></div>
+    <div class="card"><div id="calGrid" class="cal-grid"></div></div>
+    <div id="dayDetail" class="day-detail hidden">
+      <div class="day-detail-header">
+        <button onclick="navigateDay(-1)" id="btnPrevDay">‹</button>
+        <h3 id="dayDetailTitle"></h3>
+        <button onclick="navigateDay(1)" id="btnNextDay">›</button>
+        <button onclick="closeDayDetail()" class="btn-close">✕</button>
+      </div>
+      <div id="dayDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- ═══ HISTORY ═══ -->
+  <div id="view-history" class="view">
+    <div class="card">
+      <div class="card-header">
+        <h2>📋 היסטוריית משקל</h2>
+        <select id="filterUser"><option value="">כולם</option></select>
+      </div>
+      <div id="historyTable"></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ═══ FOOD EDIT MODAL ═══ -->
+<div id="foodModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>✏️ עריכת ארוחה</h3>
+      <button onclick="closeFoodModal()" class="btn-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <label>תיאור האוכל</label>
+      <textarea id="foodEditDesc" rows="3"></textarea>
+      <label>קלוריות</label>
+      <input type="number" id="foodEditCal" min="0" max="9999" />
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeFoodModal()" class="btn-secondary">ביטול</button>
+      <button onclick="saveFoodEdit()" class="btn-primary">שמור</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
