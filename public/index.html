@@ -13,9 +13,9 @@
   <div class="header-inner">
     <div class="logo">⚖️ <span>LoseIt</span></div>
     <nav class="desktop-nav">
-      <button class="nav-btn active" data-view="dashboard">🏠 דשבורד</button>
-      <button class="nav-btn" data-view="calendar">📅 לוח שנה</button>
-      <button class="nav-btn" data-view="history">📋 היסטוריה</button>
+      <button class="nav-btn active" data-view="dashboard"><span class="nav-icon">🏠</span><span class="nav-label"> דשבורד</span></button>
+      <button class="nav-btn" data-view="calendar"><span class="nav-icon">📅</span><span class="nav-label"> לוח שנה</span></button>
+      <button class="nav-btn" data-view="history"><span class="nav-icon">📋</span><span class="nav-label"> היסטוריה</span></button>
     </nav>
   </div>
 </header>
@@ -106,7 +106,7 @@
     <div class="card">
       <div class="card-header">
         <h2>📋 היסטוריית משקל</h2>
-        <select id="filterUser"><option value="">כולם</option></select>
+        <div id="filterUserBtns" class="filter-user-btns"></div>
       </div>
       <div id="historyTable"></div>
     </div>
@@ -130,6 +130,26 @@
     <div class="modal-footer">
       <button onclick="closeFoodModal()" class="btn-secondary">ביטול</button>
       <button onclick="saveFoodEdit()" class="btn-primary">שמור</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ WEIGHT EDIT MODAL ═══ -->
+<div id="weightModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>✏️ עריכת משקל</h3>
+      <button onclick="closeWeightModal()" class="btn-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <label>משקל (ק"ג)</label>
+      <input type="number" id="weightEditVal" step="0.1" min="30" max="300" />
+      <label>הערה</label>
+      <input type="text" id="weightEditNote" placeholder="הערה (אופציונלי)" />
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeWeightModal()" class="btn-secondary">ביטול</button>
+      <button onclick="saveWeightEdit()" class="btn-primary">שמור</button>
     </div>
   </div>
 </div>

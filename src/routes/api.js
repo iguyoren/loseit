@@ -56,6 +56,15 @@ router.delete('/entries/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
+router.put('/entries/:id', async (req, res) => {
+  const { weight, note } = req.body;
+  const w = parseFloat(weight);
+  if (isNaN(w) || w < 30 || w > 300) return res.status(400).json({ error: 'Invalid weight' });
+  await db.run('UPDATE weight_entries SET weight=?, note=? WHERE id=?',
+    [w, note || null, parseInt(req.params.id)]);
+  res.json({ ok: true });
+});
+
 // ── Workouts ───────────────────────────────────────────
 router.get('/workouts', async (req, res) => {
   const { phone, limit = 100 } = req.query;

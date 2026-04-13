@@ -4,6 +4,8 @@ let activePeriod = 0; // 0 = this month
 let calYear, calMonth, calPhone = '', calData = [];
 let currentDetailDate = null;
 let editingFoodId = null;
+let editingWeightId = null;
+let historyFilter = '';
 
 const HEBREW_MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 const DAYS_HE = ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
@@ -42,7 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('manualForm').addEventListener('submit', handleManualEntry);
   document.getElementById('calPrev').addEventListener('click', () => { calMonth--; if (calMonth<1){calMonth=12;calYear--;} loadCalendar(); });
   document.getElementById('calNext').addEventListener('click', () => { calMonth++; if (calMonth>12){calMonth=1;calYear++;} loadCalendar(); });
-  document.getElementById('filterUser').addEventListener('change', renderTable);
 });
 
 // ── Load ────────────────────────────────────────────────
@@ -137,9 +138,7 @@ async function renderChart() {
     const daysInMonth = new Date(y, m+1, 0).getDate();
     fromDate = new Date(y, m, 1);
     toDate   = new Date(y, m, daysInMonth);
-    labels   = Array.from({length: daysInMonth}, (_,i) => {
-      return new Date(y, m, i+1).toLocaleDateString('he-IL',{day:'numeric',month:'numeric'});
-    });
+    labels   = Array.from({length: daysInMonth}, (_,i) => String(i + 1));
   } else {
     fromDate = new Date(); fromDate.setDate(fromDate.getDate() - activePeriod);
     toDate   = new Date();
@@ -179,11 +178,11 @@ async function renderChart() {
         label: u.name, data,
         borderColor: colors[colorIdx], backgroundColor: colors[colorIdx]+'18',
         pointBackgroundColor: colors[colorIdx], pointRadius: 5,
+        pointStyle: 'circle', pointBorderColor: '#fff', pointBorderWidth: 2,
         pointHoverRadius: 7, tension: 0.35, fill: false,
         spanGaps: false,
       };
     });
-    labels = null; // hide day numbers on Y axis (monthly view)
   } else {
     // Range view
     let data = [...allEntries].reverse().filter(e => {
@@ -199,7 +198,9 @@ async function renderChart() {
         label: u?.name||ph,
         data: pts.map(e=>({x:new Date(e.recorded_at).toLocaleDateString('he-IL'),y:e.weight})),
         borderColor: colors[i], backgroundColor: colors[i]+'18',
-        pointBackgroundColor: colors[i], pointRadius: 5, tension: 0.35, fill: false,
+        pointBackgroundColor: colors[i], pointRadius: 5,
+        pointStyle: 'circle', pointBorderColor: '#fff', pointBorderWidth: 2,
+        tension: 0.35, fill: false,
       };
     });
     labels = null;
@@ -223,7 +224,10 @@ async function renderChart() {
           grid:{ color:'#e2e8f0' },
         },
         y: {
-          ticks:{ display: activePeriod !== 0, color:'#64748b', font:{size:11} },
+          ticks:{
+            color:'#64748b', font:{size:11},
+            callback: (val, idx) => activePeriod === 0 ? (idx % 5 === 0 ? val : null) : val,
+          },
           grid:{ color:'#e2e8f0' },
           reverse: false,
         },
@@ -262,10 +266,24 @@ function renderWorkoutRow(labels, workoutsByUser, fromDate, toDate) {
 }
 
 // ── History ──────────────────────────────────────────────
+function renderFilterBtns() {
+  const container = document.getElementById('filterUserBtns');
+  if (!container) return;
+  const btns = [{ phone: '', name: 'כולם' }, ...allUsers.map(u => ({ phone: u.phone, name: u.name }))];
+  container.innerHTML = btns.map(u =>
+    `<button class="filter-user-btn${historyFilter === u.phone ? ' active' : ''}" onclick="setHistoryFilter('${u.phone}')">${u.name}</button>`
+  ).join('');
+}
+
+function setHistoryFilter(phone) {
+  historyFilter = phone;
+  renderFilterBtns();
+  renderTable();
+}
+
 function renderTable() {
-  const filter  = document.getElementById('filterUser').value;
   const c       = document.getElementById('historyTable');
-  const entries = filter ? allEntries.filter(e=>e.user_phone===filter) : allEntries;
+  const entries = historyFilter ? allEntries.filter(e=>e.user_phone===historyFilter) : allEntries;
   if (!entries.length) { c.innerHTML='<p class="empty-state">אין רשומות</p>'; return; }
   c.innerHTML = `<div class="table-wrapper"><table>
     <thead><tr><th>שם</th><th>משקל</th><th>תאריך</th><th>שעה</th><th>הערה</th><th></th></tr></thead>
@@ -275,13 +293,17 @@ function renderTable() {
       const diff = prev&&prev.user_phone===e.user_phone?(e.weight-prev.weight).toFixed(1):null;
       const idx  = allUsers.findIndex(u=>u.phone===e.user_phone);
       const dBit = diff!==null?`<span style="color:${diff>0?'#f43f5e':'#10b981'};font-size:.8rem"> (${diff>0?'+':''}${diff})</span>`:'';
+      const noteEsc = (e.note||'').replace(/'/g, "\\'");
       return `<tr>
         <td><span class="badge badge-${idx}">${e.name}</span></td>
         <td><strong>${e.weight.toFixed(1)}</strong> ק"ג ${dBit}</td>
         <td>${dt.toLocaleDateString('he-IL')}</td>
         <td>${dt.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</td>
         <td>${e.note||'—'}</td>
-        <td><button class="btn-delete" onclick="deleteEntry(${e.id})">🗑️</button></td>
+        <td style="white-space:nowrap">
+          <button class="btn-edit" onclick="openWeightEdit(${e.id},${e.weight},'${noteEsc}')" title="ערוך">✏️</button>
+          <button class="btn-delete" onclick="deleteEntry(${e.id})">🗑️</button>
+        </td>
       </tr>`;
     }).join('')}</tbody></table></div>`;
 }
@@ -289,7 +311,7 @@ function renderTable() {
 function populateSelects() {
   const opts = allUsers.map(u=>`<option value="${u.phone}">${u.name}</option>`).join('');
   document.getElementById('entryUser').innerHTML = opts;
-  document.getElementById('filterUser').innerHTML = '<option value="">כולם</option>'+opts;
+  renderFilterBtns();
 }
 
 async function handleManualEntry(e) {
@@ -452,6 +474,26 @@ async function saveFoodEdit() {
   closeFoodModal(); showToast('✅ עודכן!');
   await loadCalendar();
   if(currentDetailDate) showDayDetail(currentDetailDate);
+}
+
+// ── Weight edit modal ─────────────────────────────────────
+function openWeightEdit(id, weight, note) {
+  editingWeightId = id;
+  document.getElementById('weightEditVal').value = weight;
+  document.getElementById('weightEditNote').value = note || '';
+  document.getElementById('weightModal').classList.remove('hidden');
+}
+function closeWeightModal() { document.getElementById('weightModal').classList.add('hidden'); editingWeightId = null; }
+
+async function saveWeightEdit() {
+  if (!editingWeightId) return;
+  const weight = parseFloat(document.getElementById('weightEditVal').value);
+  const note   = document.getElementById('weightEditNote').value.trim();
+  if (isNaN(weight)) { showToast('❌ משקל לא תקין'); return; }
+  await fetch(`/api/entries/${editingWeightId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weight, note }) });
+  closeWeightModal();
+  showToast('✅ עודכן!');
+  await loadAll();
 }
 
 async function deleteFoodEntry(id, dateStr) {
