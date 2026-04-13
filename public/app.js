@@ -183,6 +183,7 @@ async function renderChart() {
         spanGaps: false,
       };
     });
+    labels = null; // hide day numbers on Y axis (monthly view)
   } else {
     // Range view
     let data = [...allEntries].reverse().filter(e => {
@@ -222,7 +223,7 @@ async function renderChart() {
           grid:{ color:'#e2e8f0' },
         },
         y: {
-          ticks:{ display: false },
+          ticks:{ display: activePeriod !== 0, color:'#64748b', font:{size:11} },
           grid:{ color:'#e2e8f0' },
           reverse: false,
         },
