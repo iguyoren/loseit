@@ -222,7 +222,7 @@ async function renderChart() {
           grid:{ color:'#e2e8f0' },
         },
         y: {
-          ticks:{ color:'#64748b', font:{size:11} },
+          ticks:{ display: false },
           grid:{ color:'#e2e8f0' },
           reverse: false,
         },
