@@ -1,11 +1,12 @@
 // ── State ──────────────────────────────────────────────
-let allEntries = [], allUsers = [], chart = null;
+let allEntries = [], allUsers = [], allFoodEntries = [], chart = null;
 let activePeriod = 0; // 0 = this month
 let calYear, calMonth, calPhone = '', calData = [];
 let currentDetailDate = null;
 let editingFoodId = null;
 let editingWeightId = null;
 let historyFilter = '';
+let historyType = 'weight'; // 'weight' | 'food'
 
 const HEBREW_MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 const DAYS_HE = ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
@@ -55,6 +56,10 @@ async function loadAll() {
   ]);
   allEntries = entries; allUsers = users;
   if (users.length && !calPhone) calPhone = users[0].phone;
+  // Load food for all users
+  const foodPromises = users.map(u => fetch(`/api/food?phone=${u.phone}&limit=500`).then(r=>r.json()).then(foods=>foods.map(f=>({...f,name:u.name}))));
+  const foodArrays = await Promise.all(foodPromises);
+  allFoodEntries = foodArrays.flat().sort((a,b)=>b.recorded_at.localeCompare(a.recorded_at));
   renderUserSwitchers(stats);
   renderStats(stats);
   renderChart();
@@ -69,8 +74,14 @@ function renderUserSwitchers(stats) {
     const latest = allEntries.find(e => e.user_phone === u.phone);
     const weightStr = latest ? `${latest.weight.toFixed(1)} ק"ג` : 'אין נתונים';
     const initials = u.name.slice(0, 1);
+    const avatarHtml = `<div class="ub-avatar" style="background:${USER_COLORS[i]}">
+      <img src="/images/${u.phone}.png" class="ub-photo"
+        onerror="this.style.display='none'"
+        onload="this.parentElement.querySelector('.ub-initials').style.display='none'" />
+      <span class="ub-initials">${initials}</span>
+    </div>`;
     return `<button class="user-btn" data-phone="${u.phone}" onclick="switchUser('${u.phone}')" style="--uc:${USER_COLORS[i]}">
-      <div class="ub-avatar" style="background:${USER_COLORS[i]}">${initials}</div>
+      ${avatarHtml}
       <div class="ub-info">
         <div class="ub-name">${u.name}</div>
         <div class="ub-weight">${weightStr}</div>
@@ -118,8 +129,19 @@ function renderStats(stats) {
         <div class="progress-bar"><div class="progress-fill" style="width:${done}%"></div></div>`;
     }
     const lastDate = latest?new Date(latest.recorded_at).toLocaleDateString('he-IL'):'—';
+    const idx2 = allUsers.findIndex(u => u.phone === s.phone);
+    const color2 = USER_COLORS[idx2] || USER_COLORS[0];
+    const initials2 = s.name.slice(0, 1);
     return `<div class="stat-card">
-      <div class="name">👤 ${s.name}</div>
+      <div class="name">
+        <div class="sc-avatar" style="background:${color2}">
+          <img src="/images/${s.phone}.png" class="sc-photo"
+            onerror="this.style.display='none'"
+            onload="this.parentElement.querySelector('.sc-initials').style.display='none'" />
+          <span class="sc-initials">${initials2}</span>
+        </div>
+        ${s.name}
+      </div>
       <div class="current-weight">${latest?latest.weight.toFixed(1):'—'} <small>ק"ג</small></div>
       <div class="meta"><span class="change ${cls}">${diff!==null?arrow:''} ${diffTxt}</span>
         <span>עודכן: ${lastDate} · ${s.total_entries||0} מדידות</span></div>
@@ -138,7 +160,8 @@ async function renderChart() {
     const daysInMonth = new Date(y, m+1, 0).getDate();
     fromDate = new Date(y, m, 1);
     toDate   = new Date(y, m, daysInMonth);
-    labels   = Array.from({length: daysInMonth}, (_,i) => String(i + 1));
+    // labels = "1/4", "2/4", ...
+    labels = Array.from({length: daysInMonth}, (_,i) => `${i+1}/${m+1}`);
   } else {
     fromDate = new Date(); fromDate.setDate(fromDate.getDate() - activePeriod);
     toDate   = new Date();
@@ -169,9 +192,13 @@ async function renderChart() {
       const colorIdx = allUsers.findIndex(x => x.phone === u.phone);
       const userEntries = allEntries.filter(e => e.user_phone === u.phone);
       const entryByDate = {};
-      userEntries.forEach(e => { entryByDate[e.recorded_at.slice(0,10)] = e.weight; });
+      // allEntries מסודר מהחדש לישן — לוקחים רק את הראשון (=הכי עדכני) לכל יום
+      userEntries.forEach(e => {
+        const d = e.recorded_at.slice(0,10);
+        if (entryByDate[d] === undefined) entryByDate[d] = e.weight;
+      });
       const data = Array.from({length: labels.length}, (_,idx) => {
-        const d = new Date(y, m, idx+1).toISOString().slice(0,10);
+        const d = `${y}-${String(m+1).padStart(2,'0')}-${String(idx+1).padStart(2,'0')}`;
         return entryByDate[d] ?? null;
       });
       return {
@@ -207,6 +234,16 @@ async function renderChart() {
   }
 
   if (chart) chart.destroy();
+
+  // חישוב טווח ציר Y אוטומטי לפי הנתונים
+  const allWeights = datasets.flatMap(ds =>
+    Array.isArray(ds.data)
+      ? ds.data.filter(v => v !== null && typeof v === 'number')
+      : ds.data.map(p => p.y).filter(v => v != null)
+  );
+  const yMin = allWeights.length ? Math.floor(Math.min(...allWeights) - 2) : 40;
+  const yMax = allWeights.length ? Math.ceil(Math.max(...allWeights)  + 2) : 120;
+
   chart = new Chart(ctx, {
     type: 'line',
     data: { labels: labels||undefined, datasets },
@@ -216,20 +253,23 @@ async function renderChart() {
       interaction: { mode:'index', intersect:false },
       plugins: {
         legend: { labels: { color:'#1e293b', font:{size:13} } },
-        tooltip: { callbacks: { label: c=>`${c.dataset.label}: ${c.parsed.x?.toFixed(1)||'—'} ק"ג` } },
+        tooltip: { callbacks: {
+          label: c => `${c.dataset.label}: ${(c.parsed.x ?? c.parsed.y)?.toFixed(1) || '—'} ק"ג`
+        }},
       },
       scales: {
         x: {
+          min: yMin, max: yMax,
           ticks:{ color:'#64748b', callback: v=>`${v} ק"ג` },
           grid:{ color:'#e2e8f0' },
         },
         y: {
+          reverse: true,
           ticks:{
             color:'#64748b', font:{size:11},
-            callback: (val, idx) => activePeriod === 0 ? (idx % 5 === 0 ? val : null) : val,
+            callback: (val, idx) => activePeriod === 0 ? labels[idx] : val,
           },
           grid:{ color:'#e2e8f0' },
-          reverse: false,
         },
       },
     },
@@ -256,7 +296,7 @@ function renderWorkoutRow(labels, workoutsByUser, fromDate, toDate) {
   });
 
   row.innerHTML = labels.map((lbl, idx) => {
-    const dateStr = new Date(y, m, idx+1).toISOString().slice(0,10);
+    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(idx+1).padStart(2,'0')}`;
     const emojis  = allWorkouts[dateStr];
     return `<div class="workout-day" title="${emojis ? emojis.join(' ') : ''}">
       ${emojis ? emojis.join('') : ''}
@@ -282,30 +322,70 @@ function setHistoryFilter(phone) {
 }
 
 function renderTable() {
-  const c       = document.getElementById('historyTable');
-  const entries = historyFilter ? allEntries.filter(e=>e.user_phone===historyFilter) : allEntries;
-  if (!entries.length) { c.innerHTML='<p class="empty-state">אין רשומות</p>'; return; }
+  const c = document.getElementById('historyTable');
+
+  // Merge weight + food entries sorted by date desc
+  const weights = (historyFilter ? allEntries.filter(e=>e.user_phone===historyFilter) : allEntries)
+    .map(e => ({ ...e, _type: 'weight' }));
+  const foods = (historyFilter ? allFoodEntries.filter(e=>e.user_phone===historyFilter) : allFoodEntries)
+    .map(e => ({ ...e, _type: 'food' }));
+
+  const merged = [...weights, ...foods].sort((a,b) => b.recorded_at.localeCompare(a.recorded_at));
+
+  if (!merged.length) { c.innerHTML='<p class="empty-state">אין רשומות</p>'; return; }
+
+  // For weight diff calculation
+  const weightByUser = {};
+
   c.innerHTML = `<div class="table-wrapper"><table>
-    <thead><tr><th>שם</th><th>משקל</th><th>תאריך</th><th>שעה</th><th>הערה</th><th></th></tr></thead>
-    <tbody>${entries.map((e,i)=>{
-      const dt   = new Date(e.recorded_at);
-      const prev = entries[i+1];
-      const diff = prev&&prev.user_phone===e.user_phone?(e.weight-prev.weight).toFixed(1):null;
-      const idx  = allUsers.findIndex(u=>u.phone===e.user_phone);
-      const dBit = diff!==null?`<span style="color:${diff>0?'#f43f5e':'#10b981'};font-size:.8rem"> (${diff>0?'+':''}${diff})</span>`:'';
-      const noteEsc = (e.note||'').replace(/'/g, "\\'");
-      return `<tr>
-        <td><span class="badge badge-${idx}">${e.name}</span></td>
-        <td><strong>${e.weight.toFixed(1)}</strong> ק"ג ${dBit}</td>
-        <td>${dt.toLocaleDateString('he-IL')}</td>
-        <td>${dt.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</td>
-        <td>${e.note||'—'}</td>
-        <td style="white-space:nowrap">
-          <button class="btn-edit" onclick="openWeightEdit(${e.id},${e.weight},'${noteEsc}')" title="ערוך">✏️</button>
-          <button class="btn-delete" onclick="deleteEntry(${e.id})">🗑️</button>
-        </td>
-      </tr>`;
+    <thead><tr><th>שם</th><th>סוג</th><th>פרטים</th><th>תאריך</th><th>שעה</th><th>מקור</th><th></th></tr></thead>
+    <tbody>${merged.map(e => {
+      const dt  = new Date(e.recorded_at);
+      const idx = allUsers.findIndex(u=>u.phone===e.user_phone);
+      const srcLabel = e.raw_message
+        ? `<span class="src-badge src-bot">📱 בוט</span>`
+        : `<span class="src-badge src-manual">🖥️ ידני</span>`;
+
+      if (e._type === 'weight') {
+        const prev = weightByUser[e.user_phone];
+        const diff = prev !== undefined ? (e.weight - prev).toFixed(1) : null;
+        weightByUser[e.user_phone] = e.weight;
+        const dBit = diff !== null
+          ? `<span style="color:${diff>0?'#f43f5e':'#10b981'};font-size:.8rem"> (${diff>0?'+':''}${diff})</span>` : '';
+        return `<tr>
+          <td><span class="badge badge-${idx}">${e.name}</span></td>
+          <td><span class="type-badge type-weight">⚖️ משקל</span></td>
+          <td><strong>${e.weight.toFixed(1)}</strong> ק"ג ${dBit}</td>
+          <td>${dt.toLocaleDateString('he-IL')}</td>
+          <td>${dt.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</td>
+          <td>${srcLabel}</td>
+          <td style="white-space:nowrap">
+            <button class="btn-edit" onclick="openWeightEditById(${e.id})" title="ערוך">✏️</button>
+            <button class="btn-delete" onclick="deleteEntry(${e.id})">🗑️</button>
+          </td>
+        </tr>`;
+      } else {
+        return `<tr>
+          <td><span class="badge badge-${idx}">${e.name}</span></td>
+          <td><span class="type-badge type-food">🍽️ אכילה</span></td>
+          <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${displayDesc(e.description)}">${displayDesc(e.description)}${e.calories?` <span style="color:var(--muted);font-size:.8rem">(${e.calories} קל)</span>`:''}</td>
+          <td>${dt.toLocaleDateString('he-IL')}</td>
+          <td>${dt.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</td>
+          <td>${srcLabel}</td>
+          <td style="white-space:nowrap">
+            <button class="btn-edit" onclick="openFoodEdit(${e.id},'${encodeURIComponent(e.description)}',${e.calories||0})" title="ערוך">✏️</button>
+            <button class="btn-delete" onclick="deleteFoodFromHistory(${e.id})">🗑️</button>
+          </td>
+        </tr>`;
+      }
     }).join('')}</tbody></table></div>`;
+}
+
+async function deleteFoodFromHistory(id) {
+  await fetch(`/api/food/${id}`, {method:'DELETE'});
+  allFoodEntries = allFoodEntries.filter(e=>e.id!==id);
+  renderFoodTable(document.getElementById('historyTable'));
+  showToast('🗑️ נמחק');
 }
 
 function populateSelects() {
@@ -372,8 +452,8 @@ function renderCalGrid() {
       if(d.workouts.length) chips+=`<div class="day-chip chip-workout">${workoutEmoji(d.workouts[0].type)} ${d.workouts[0].type}</div>`;
       if(d.totalCalories)   chips+=`<div class="day-chip chip-cal">🔥 ${d.totalCalories} קל</div>`;
     }
-    const cls=['cal-day',d?'has-data':'',isFull?'full-day':'',isToday?'today':''].filter(Boolean).join(' ');
-    html+=`<div class="${cls}" ${d?`onclick="showDayDetail('${ds}')"`:''}><div class="day-num${isToday?' today-num':''}">${day}</div>${chips}</div>`;
+    const cls=['cal-day',d?'has-data':'clickable-day',isFull?'full-day':'',isToday?'today':''].filter(Boolean).join(' ');
+    html+=`<div class="${cls}" onclick="showDayDetail('${ds}')"><div class="day-num${isToday?' today-num':''}">${day}</div>${chips}</div>`;
   }
   document.getElementById('calGrid').innerHTML=html;
 }
@@ -434,22 +514,14 @@ function showDayDetail(dateStr) {
   let html='';
   if(d){
     if(d.weights.length) html+=`<div class="detail-section"><h4>⚖️ משקל</h4>${
-      d.weights.map(w=>`<div class="detail-item"><span class="di-label">${new Date(w.time).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</span><span class="di-value">${w.weight.toFixed(1)} ק"ג</span></div>`).join('')}</div>`;
+      d.weights.map(w=>`<div class="detail-item"><span class="di-label">${new Date(w.time).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</span><span class="di-value">${w.weight.toFixed(1)} ק"ג</span></div>
+        ${w.note?`<div class="weight-note">📝 ${w.note.replace(/\n/g,' · ')}</div>`:''}`).join('')}</div>`;
     if(d.workouts.length) html+=`<div class="detail-section"><h4>🏃 אימונים</h4>${
       d.workouts.map(w=>`<div class="detail-item"><span class="di-label">${workoutEmoji(w.type)} ${w.type}</span><span style="color:var(--muted);font-size:.85rem">${w.description||''}</span></div>`).join('')}</div>`;
-    if(d.foods.length) html+=`<div class="detail-section"><h4>🍽️ אכילה</h4>${
-      d.foods.map(f=>`<div class="detail-item">
-        <span class="di-label">${f.description}</span>
-        <span class="di-value">${f.calories?f.calories+' קל':''}</span>
-        <div class="di-actions">
-          <button class="btn-edit" onclick="openFoodEdit(${f.id},'${encodeURIComponent(f.description)}',${f.calories||0})" title="ערוך">✏️</button>
-          <button class="btn-delete" onclick="deleteFoodEntry(${f.id},'${dateStr}')" title="מחק">🗑️</button>
-        </div>
-      </div>`).join('')}
-      ${d.totalCalories?`<div class="food-total">🔥 סה"כ יום: ${d.totalCalories.toLocaleString()} קלוריות</div>`:''}
-    </div>`;
+    html+=`<div class="detail-section"><h4>🍽️ אכילה</h4>${buildInlineFoodPanel(dateStr, d.foods)}</div>`;
+  } else {
+    html=`<div class="detail-section"><h4>🍽️ אכילה</h4>${buildInlineFoodPanel(dateStr, [])}</div>`;
   }
-  if(!html) html='<p class="empty-state">אין נתונים ליום זה 📭</p>';
   document.getElementById('dayDetailBody').innerHTML=html;
   document.getElementById('dayDetail').classList.remove('hidden');
   document.getElementById('dayDetail').scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -457,26 +529,381 @@ function showDayDetail(dateStr) {
 
 function closeDayDetail(){ document.getElementById('dayDetail').classList.add('hidden'); }
 
+// ── Inline food editing in day detail ────────────────────
+let dayFoodRows = [];   // [{ desc, cal, foodId|null }]
+let dayFoodPhone = '';
+let dayFoodDate  = '';
+
+function buildInlineFoodPanel(dateStr, foods) {
+  dayFoodDate  = dateStr;
+  dayFoodPhone = calPhone;
+
+  // Flatten all food entries into rows
+  dayFoodRows = [];
+  foods.forEach(f => {
+    const items = parseFoodDesc(f.description);
+    if (items.length === 0) items.push({ desc: f.description, cal: f.calories || 0 });
+    items.forEach(it => dayFoodRows.push({ desc: it.desc, cal: it.cal, foodId: f.id }));
+  });
+
+  return renderInlineFoodHTML();
+}
+
+function renderInlineFoodHTML() {
+  const total = dayFoodRows.reduce((s, r) => s + (parseInt(r.cal) || 0), 0);
+  const rows  = dayFoodRows.map((r, i) => `
+    <div class="ifl-row" id="ifl-row-${i}">
+      <input class="ifl-desc" type="text" value="${r.desc.replace(/"/g,'&quot;')}"
+        oninput="dayFoodRows[${i}].desc=this.value; refreshFoodTotal()"
+        placeholder="תיאור" />
+      <div class="ifl-cal-wrap">
+        <input class="ifl-cal" type="number" value="${r.cal||''}" min="0" max="9999"
+          oninput="dayFoodRows[${i}].cal=parseInt(this.value)||0; refreshFoodTotal()"
+          placeholder="קל׳" id="ifl-cal-${i}" />
+        <button class="btn-calc-cal" onclick="estimateOneRow(${i})" title="חשב קלוריות">🔍</button>
+      </div>
+      <button class="btn-remove-item" onclick="removeDayFoodRow(${i})">✕</button>
+    </div>`).join('');
+
+  return `<div id="inlineFoodPanel">
+    <div class="ifl-header"><span>פריט</span><span>קל׳</span><span></span></div>
+    <div id="iflRows">${rows}</div>
+    <div class="ifl-actions-row">
+      <button class="btn-add-item" onclick="addDayFoodRow()">+ הוסף שורה</button>
+      <button class="btn-calc-all" onclick="estimateAllRows()">🔍 חשב קלוריות לכולם</button>
+    </div>
+    <div class="food-total" style="margin-top:10px">🔥 סה"כ יום: <span id="dayFoodTotal">${total}</span> קלוריות</div>
+    <div style="text-align:left;margin-top:10px">
+      <button class="btn-primary" style="font-size:.85rem;padding:8px 24px" onclick="saveDayFood()">שמור</button>
+    </div>
+  </div>`;
+}
+
+function refreshFoodTotal() {
+  const total = dayFoodRows.reduce((s, r) => s + (parseInt(r.cal) || 0), 0);
+  const el = document.getElementById('dayFoodTotal');
+  if (el) el.textContent = total;
+}
+
+async function estimateOneRow(i) {
+  const desc = dayFoodRows[i].desc.trim();
+  if (!desc) return;
+  const btn = document.querySelector(`#ifl-row-${i} .btn-calc-cal`);
+  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+  try {
+    const r = await fetch('/api/estimate', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ text: desc })
+    });
+    const data = await r.json();
+    const cal = data.total || 0;
+    const b = data.breakdown?.[0];
+    const notFound = !data.total && data.breakdown?.every(b => b.cal === 0);
+    const fromOnline = b?.source === 'online';
+    dayFoodRows[i].cal = cal;
+    const input = document.getElementById(`ifl-cal-${i}`);
+    if (input) {
+      input.value = cal;
+      if (notFound) {
+        input.classList.add('ifl-cal-unknown');
+        input.title = 'לא זוהה — הכנס ידנית';
+        setTimeout(() => { input.classList.remove('ifl-cal-unknown'); input.title=''; }, 2500);
+        showToast(`❓ "${desc}" לא זוהה — הכנס ידנית`);
+      } else if (fromOnline) {
+        input.classList.add('ifl-cal-online');
+        input.title = `מקור: foodsdictionary.co.il (${b.note})`;
+        setTimeout(() => { input.classList.remove('ifl-cal-online'); input.title=''; }, 1200);
+      } else {
+        input.classList.add('ifl-cal-updated');
+        setTimeout(() => input.classList.remove('ifl-cal-updated'), 800);
+      }
+    }
+    refreshFoodTotal();
+  } catch(e) { showToast('❌ שגיאה בחישוב'); }
+  if (btn) { btn.textContent = '🔍'; btn.disabled = false; }
+}
+
+async function estimateAllRows() {
+  const btn = document.querySelector('.btn-calc-all');
+  if (btn) { btn.textContent = '⏳ מחשב...'; btn.disabled = true; }
+  for (let i = 0; i < dayFoodRows.length; i++) {
+    if (dayFoodRows[i].desc.trim()) await estimateOneRow(i);
+  }
+  if (btn) { btn.textContent = '🔍 חשב קלוריות לכולם'; btn.disabled = false; }
+  showToast('✅ חישוב הושלם');
+}
+
+function addDayFoodRow() {
+  dayFoodRows.push({ desc: '', cal: 0, foodId: null });
+  const panel = document.getElementById('inlineFoodPanel');
+  if (!panel) return;
+  const i = dayFoodRows.length - 1;
+  const div = document.createElement('div');
+  div.className = 'ifl-row';
+  div.id = `ifl-row-${i}`;
+  div.innerHTML = `
+    <input class="ifl-desc" type="text" value=""
+      oninput="dayFoodRows[${i}].desc=this.value; refreshFoodTotal()"
+      placeholder="תיאור" />
+    <input class="ifl-cal" type="number" value="" min="0" max="9999"
+      oninput="dayFoodRows[${i}].cal=parseInt(this.value)||0; refreshFoodTotal()"
+      placeholder="קל׳" />
+    <button class="btn-remove-item" onclick="removeDayFoodRow(${i})">✕</button>`;
+  document.getElementById('iflRows').appendChild(div);
+  div.querySelector('.ifl-desc').focus();
+}
+
+function removeDayFoodRow(i) {
+  dayFoodRows.splice(i, 1);
+  // Re-render the rows section
+  const panel = document.getElementById('inlineFoodPanel');
+  if (panel) {
+    const container = document.getElementById('dayDetail');
+    // Re-render the whole food section by refreshing showDayDetail
+    showDayDetail(dayFoodDate);
+  }
+}
+
+async function saveDayFood() {
+  const validRows = dayFoodRows.filter(r => r.desc.trim());
+  // Group by foodId (null = new)
+  const existingIds = [...new Set(dayFoodRows.map(r => r.foodId).filter(Boolean))];
+
+  if (validRows.length === 0) {
+    // Delete all existing food entries for the day
+    for (const id of existingIds) {
+      await fetch(`/api/food/${id}`, { method: 'DELETE' });
+    }
+  } else {
+    const desc = buildFoodDesc(validRows);
+    const cal  = validRows.reduce((s, r) => s + (parseInt(r.cal) || 0), 0);
+    if (existingIds.length > 0) {
+      // Update first entry, delete the rest
+      await fetch(`/api/food/${existingIds[0]}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: desc, calories: cal })
+      });
+      for (const id of existingIds.slice(1)) {
+        await fetch(`/api/food/${id}`, { method: 'DELETE' });
+      }
+    } else {
+      // Create new entry
+      await fetch('/api/food', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_phone: dayFoodPhone, description: desc, calories: cal, date: dayFoodDate })
+      });
+    }
+  }
+
+  showToast('✅ נשמר!');
+  // Reload calendar data and refresh
+  const newData = await fetch(`/api/calendar?phone=${calPhone}&year=${calYear}&month=${calMonth}`).then(r=>r.json());
+  calData = newData;
+  renderCalGrid();
+  showDayDetail(dayFoodDate);
+
+  // Update food history cache
+  const foodArrays = await Promise.all(allUsers.map(u =>
+    fetch(`/api/food?phone=${u.phone}&limit=500`).then(r=>r.json()).then(foods=>foods.map(f=>({...f,name:u.name})))
+  ));
+  allFoodEntries = foodArrays.flat().sort((a,b)=>b.recorded_at.localeCompare(a.recorded_at));
+  renderTable();
+}
+
+// ── Add food for specific date (modal — kept for backward compat) ────
+let addFoodDate = null, addFoodPhone = null;
+let addFoodItems = [];
+
+function openAddFoodForDate(dateStr, phone) {
+  addFoodDate = dateStr;
+  addFoodPhone = phone;
+  addFoodItems = [{ desc: '', cal: 0 }];
+  renderAddFoodItems();
+  document.getElementById('addFoodDateTitle').textContent =
+    new Date(dateStr+'T12:00:00').toLocaleDateString('he-IL',{day:'numeric',month:'long'});
+  document.getElementById('addFoodModal').classList.remove('hidden');
+}
+
+function renderAddFoodItems() {
+  const list = document.getElementById('addFoodItemsList');
+  list.innerHTML = addFoodItems.map((item, i) => `
+    <div class="food-item-row">
+      <input class="food-item-desc" type="text" value="${item.desc.replace(/"/g,'&quot;')}"
+        oninput="addFoodItems[${i}].desc=this.value"
+        placeholder="תיאור פריט" />
+      <input class="food-item-cal" type="number" value="${item.cal||''}" min="0" max="9999"
+        oninput="addFoodItems[${i}].cal=parseInt(this.value)||0; updateAddFoodTotal()"
+        placeholder="קל׳" />
+      <button class="btn-remove-item" onclick="removeAddFoodItem(${i})" title="הסר">✕</button>
+    </div>`).join('');
+  updateAddFoodTotal();
+}
+
+function updateAddFoodTotal() {
+  const total = addFoodItems.reduce((s, it) => s + (parseInt(it.cal)||0), 0);
+  document.getElementById('addFoodTotalCalc').textContent = total;
+}
+
+function addFoodItem() {
+  // work out which modal is open and add to the right list
+  const editOpen = !document.getElementById('foodModal').classList.contains('hidden');
+  if (editOpen) {
+    foodItems.push({ desc: '', cal: 0 });
+    renderFoodItems();
+    const inputs = document.querySelectorAll('#foodItemsList .food-item-desc');
+    if (inputs.length) inputs[inputs.length-1].focus();
+  } else {
+    addFoodItems.push({ desc: '', cal: 0 });
+    renderAddFoodItems();
+    const inputs = document.querySelectorAll('#addFoodItemsList .food-item-desc');
+    if (inputs.length) inputs[inputs.length-1].focus();
+  }
+}
+
+function removeAddFoodItem(i) {
+  addFoodItems.splice(i, 1);
+  if (!addFoodItems.length) addFoodItems = [{ desc: '', cal: 0 }];
+  renderAddFoodItems();
+}
+
+function closeAddFoodModal() {
+  document.getElementById('addFoodModal').classList.add('hidden');
+  addFoodDate = null; addFoodPhone = null; addFoodItems = [];
+}
+
+async function saveAddFood() {
+  const desc = buildFoodDesc(addFoodItems);
+  const cal  = addFoodItems.reduce((s, it) => s + (parseInt(it.cal)||0), 0);
+  if (!desc) return;
+  await fetch('/api/food', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ user_phone: addFoodPhone, description: desc, calories: cal, date: addFoodDate })
+  });
+  closeAddFoodModal(); showToast('✅ ארוחה נוספה!');
+  await loadCalendar();
+  if (currentDetailDate) showDayDetail(currentDetailDate);
+}
+
 // ── Food edit modal ───────────────────────────────────────
-function openFoodEdit(id, descEncoded, cal) {
-  editingFoodId=id;
-  document.getElementById('foodEditDesc').value=decodeURIComponent(descEncoded);
-  document.getElementById('foodEditCal').value=cal;
+let foodItems = []; // [{ desc, cal }]
+
+// Strip embedded [cal] tags for display
+function displayDesc(desc) {
+  return (desc||'').replace(/\s*\[\d+\]/g, '');
+}
+
+// Parse saved description — supports "item [cal]" format or plain text
+function parseFoodDesc(desc) {
+  const items = desc.split(/,\s*/).map(s => s.trim()).filter(Boolean);
+  return items.map(s => {
+    const m = s.match(/^(.*?)\s*\[(\d+)\]$/);
+    if (m) return { desc: m[1].trim(), cal: parseInt(m[2]) };
+    return { desc: s, cal: 0 };
+  });
+}
+
+// Build description string with embedded calories
+function buildFoodDesc(items) {
+  return items.filter(it=>it.desc).map(it => `${it.desc} [${parseInt(it.cal)||0}]`).join(', ');
+}
+
+async function openFoodEdit(id, descEncoded, totalCal) {
+  editingFoodId = id;
+  const desc = decodeURIComponent(descEncoded);
+
+  // Try to parse embedded [cal] format first
+  const parsed = parseFoodDesc(desc);
+  const hasEmbedded = parsed.some(p => p.cal > 0);
+
+  if (hasEmbedded) {
+    foodItems = parsed;
+  } else {
+    // Fallback: estimate from server
+    let breakdown = [];
+    try {
+      const r = await fetch('/api/estimate', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ text: desc })
+      });
+      const data = await r.json();
+      breakdown = data.breakdown || [];
+    } catch(e) {}
+
+    if (breakdown.length > 0) {
+      foodItems = breakdown.map(b => ({ desc: b.item, cal: b.cal }));
+    } else {
+      foodItems = parsed.length ? parsed : [{ desc: '', cal: 0 }];
+    }
+  }
+  if (!foodItems.length) foodItems = [{ desc: '', cal: 0 }];
+
+  renderFoodItems();
   document.getElementById('foodModal').classList.remove('hidden');
 }
-function closeFoodModal(){ document.getElementById('foodModal').classList.add('hidden'); editingFoodId=null; }
+
+function renderFoodItems() {
+  const list = document.getElementById('foodItemsList');
+  list.innerHTML = foodItems.map((item, i) => `
+    <div class="food-item-row">
+      <input class="food-item-desc" type="text" value="${item.desc.replace(/"/g,'&quot;')}"
+        oninput="foodItems[${i}].desc=this.value"
+        placeholder="תיאור פריט" />
+      <input class="food-item-cal" type="number" value="${item.cal}" min="0" max="9999"
+        oninput="foodItems[${i}].cal=parseInt(this.value)||0; updateFoodTotal()"
+        placeholder="קל׳" />
+      <button class="btn-remove-item" onclick="removeFoodItem(${i})" title="הסר">✕</button>
+    </div>`).join('');
+  updateFoodTotal();
+}
+
+function updateFoodTotal() {
+  const total = foodItems.reduce((s, it) => s + (parseInt(it.cal)||0), 0);
+  document.getElementById('foodTotalCalc').textContent = total;
+}
+
+function addFoodItem() {
+  foodItems.push({ desc: '', cal: 0 });
+  renderFoodItems();
+  const inputs = document.querySelectorAll('.food-item-desc');
+  if (inputs.length) inputs[inputs.length-1].focus();
+}
+
+function removeFoodItem(i) {
+  foodItems.splice(i, 1);
+  if (!foodItems.length) foodItems = [{ desc: '', cal: 0 }];
+  renderFoodItems();
+}
+
+function closeFoodModal() {
+  document.getElementById('foodModal').classList.add('hidden');
+  editingFoodId = null;
+  foodItems = [];
+}
 
 async function saveFoodEdit() {
-  if(!editingFoodId) return;
-  const desc=document.getElementById('foodEditDesc').value.trim();
-  const cal =parseInt(document.getElementById('foodEditCal').value)||0;
-  await fetch(`/api/food/${editingFoodId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:desc,calories:cal})});
+  if (!editingFoodId) return;
+  const desc = buildFoodDesc(foodItems);
+  const cal  = foodItems.reduce((s, it) => s + (parseInt(it.cal)||0), 0);
+  await fetch(`/api/food/${editingFoodId}`, {
+    method: 'PUT', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ description: desc, calories: cal })
+  });
+  // Update local cache
+  const fe = allFoodEntries.find(e=>e.id===editingFoodId);
+  if (fe) { fe.description = desc; fe.calories = cal; }
   closeFoodModal(); showToast('✅ עודכן!');
+  renderTable();
   await loadCalendar();
-  if(currentDetailDate) showDayDetail(currentDetailDate);
+  if (currentDetailDate) showDayDetail(currentDetailDate);
 }
 
 // ── Weight edit modal ─────────────────────────────────────
+function openWeightEditById(id) {
+  const e = allEntries.find(e=>e.id===id);
+  if (!e) return;
+  openWeightEdit(id, e.weight, e.note||'');
+}
+
 function openWeightEdit(id, weight, note) {
   editingWeightId = id;
   document.getElementById('weightEditVal').value = weight;

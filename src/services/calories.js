@@ -1,10 +1,14 @@
 // Simple Hebrew food calorie estimator
+const axios   = require('axios');
+const cheerio = require('cheerio');
+
 const FOOD_DB = [
   // חלבונים
   { keys: ['חזה עוף', 'עוף'],        cal: 165, per: 100, unit: 'g' },
   { keys: ['בשר בקר', 'בקר', 'בשר'], cal: 250, per: 100, unit: 'g' },
   { keys: ['סלמון', 'דג סלמון'],      cal: 208, per: 100, unit: 'g' },
   { keys: ['טונה'],                   cal: 130, per: 100, unit: 'g' },
+  { keys: ['סרדינים', 'סרדין'],       cal: 208, per: 100, unit: 'g' },
   { keys: ['דג'],                     cal: 140, per: 100, unit: 'g' },
   { keys: ['ביצה', 'ביצים'],          cal: 78,  per: 1,   unit: 'unit' },
   { keys: ['גבינה צהובה'],            cal: 350, per: 100, unit: 'g' },
@@ -144,4 +148,71 @@ function detectWorkoutType(text) {
   return { type: text.slice(0, 30), emoji: '🏋️' };
 }
 
-module.exports = { estimateCalories, detectWorkoutType };
+// ── External lookup: foodsdictionary.co.il ────────────────
+async function lookupCaloriesOnline(query) {
+  try {
+    const encoded = encodeURIComponent(query);
+    const res = await axios.post(
+      'https://www.foodsdictionary.co.il/calculators/MenuFoodsSearch.php',
+      `q=${encoded}&typecmd=0`,
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Referer': 'https://www.foodsdictionary.co.il/calculators/calories.php',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+        timeout: 6000,
+      }
+    );
+
+    const $ = cheerio.load(res.data);
+    let calories = null;
+
+    // Take the first result
+    $('input.add-product-btn').each((i, el) => {
+      if (i > 0) return false; // only first
+      const id = $(el).data('id');
+      const cal = parseFloat($(`#productCal${id}`).data('value'));
+      if (!isNaN(cal) && cal > 0) calories = cal;
+    });
+
+    return calories; // per 100g
+  } catch (err) {
+    console.warn('[Calories] online lookup failed:', err.message);
+    return null;
+  }
+}
+
+// Async version of estimateCalories with online fallback
+async function estimateCaloriesAsync(text) {
+  if (!text) return { total: 0, breakdown: [] };
+
+  const items = text.split(/[,،\n]+/).map(s => s.trim()).filter(Boolean);
+  let total = 0;
+  const breakdown = [];
+
+  for (const item of items) {
+    const local = estimateItem(item);
+    if (local) {
+      total += local.cal;
+      breakdown.push({ item, cal: local.cal, note: local.note, source: 'local' });
+    } else {
+      // Fallback: online lookup
+      const cal100 = await lookupCaloriesOnline(item);
+      if (cal100 !== null) {
+        // Assume ~150g serving if no gram info
+        const gramMatch = item.match(GRAM_PATTERN);
+        const quantity = gramMatch ? parseInt(gramMatch[1]) : 150;
+        const cal = Math.round(cal100 * quantity / 100);
+        total += cal;
+        breakdown.push({ item, cal, note: `~${quantity}ג (מהאינטרנט)`, source: 'online' });
+      } else {
+        breakdown.push({ item, cal: 0, note: 'לא זוהה', source: 'none' });
+      }
+    }
+  }
+
+  return { total: Math.round(total), breakdown };
+}
+
+module.exports = { estimateCalories, estimateCaloriesAsync, detectWorkoutType };

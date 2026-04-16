@@ -29,8 +29,10 @@ async function sendMessage(to, text) {
     );
     console.log(`[WhatsApp] Sent to ${to}: ${text}`);
   } catch (err) {
-    const msg = err.response?.data?.error?.message || err.message;
-    console.error(`[WhatsApp] Send failed: ${msg}`);
+    const errData = err.response?.data?.error;
+    const msg = errData ? `(#${errData.code}) ${errData.message}` : err.message;
+    console.error(`[WhatsApp] Send failed to ${to}: ${msg}`);
+    throw new Error(msg); // העבר את השגיאה הלאה
   }
 }
 

@@ -10,7 +10,9 @@ const PORT = process.env.PORT || 3002;
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/api', require('./src/routes/api'));
+app.use('/api',        require('./src/routes/api'));
+app.use('/webhook',    require('./src/routes/webhook'));
+app.use('/api/cron',   require('./src/routes/cron'));
 
 // QR page (local only)
 if (process.env.NODE_ENV !== 'production') {

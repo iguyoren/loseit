@@ -17,6 +17,20 @@ function getDb() {
 }
 
 async function init() {
+  // Neon DB "נרדם" אחרי חוסר פעילות — מנסים עד 3 פעמים עם השהייה
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await _initOnce();
+    } catch (err) {
+      if (attempt === MAX_RETRIES) throw err;
+      console.warn(`[DB] ניסיון ${attempt} נכשל, מנסה שוב...`);
+      await new Promise(r => setTimeout(r, 1000 * attempt));
+    }
+  }
+}
+
+async function _initOnce() {
   const sql = getDb();
   await sql.query(`CREATE TABLE IF NOT EXISTS users (
     id            SERIAL PRIMARY KEY,
