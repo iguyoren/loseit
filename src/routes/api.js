@@ -198,7 +198,7 @@ router.post('/ingest', async (req, res) => {
 router.get('/logs', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 200, 500);
   res.json(await db.q(
-    `SELECT id, ip, user_agent, path, created_at
+    `SELECT id, ip, user_agent, path, user_name, created_at
      FROM access_logs ORDER BY created_at DESC LIMIT ?`, [limit]));
 });
 
