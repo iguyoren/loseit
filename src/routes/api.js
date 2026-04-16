@@ -194,6 +194,19 @@ router.post('/ingest', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Access logs ────────────────────────────────────────
+router.get('/logs', async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 200, 500);
+  res.json(await db.q(
+    `SELECT id, ip, user_agent, path, created_at
+     FROM access_logs ORDER BY created_at DESC LIMIT ?`, [limit]));
+});
+
+router.delete('/logs', async (req, res) => {
+  await db.run('DELETE FROM access_logs');
+  res.json({ ok: true });
+});
+
 // ── Send test message ──────────────────────────────────
 router.post('/send-message', async (req, res) => {
   const apiKey = req.headers['x-api-key'];

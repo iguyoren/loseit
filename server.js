@@ -2,13 +2,26 @@ require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
 const path    = require('path');
-const { init } = require('./src/database/db');
+const { init, q } = require('./src/database/db');
 
 const app  = express();
 const PORT = process.env.PORT || 3002;
 
 app.use(cors());
 app.use(express.json());
+
+// ── Access logger — רושם כניסות לאתר (רק דפי HTML, לא assets) ──
+app.use((req, res, next) => {
+  const skip = req.path.startsWith('/api') || req.path.startsWith('/webhook') ||
+               /\.(js|css|png|jpg|ico|svg|woff|woff2|ttf)$/.test(req.path);
+  if (!skip) {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || '';
+    const ua = req.headers['user-agent'] || '';
+    q('INSERT INTO access_logs (ip, user_agent, path) VALUES (?,?,?)', [ip, ua, req.path]).catch(() => {});
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api',        require('./src/routes/api'));
 app.use('/webhook',    require('./src/routes/webhook'));

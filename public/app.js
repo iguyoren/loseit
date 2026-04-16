@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById(`view-${view}`).classList.add('active');
     window.scrollTo(0, 0);
     if (view === 'calendar' && calPhone) loadCalendar();
+    if (view === 'logs') loadLogs();
   }
 
   document.querySelectorAll('.nav-btn, .mob-nav-btn').forEach(btn => btn.addEventListener('click', () => navigateTo(btn.dataset.view)));
@@ -933,6 +934,65 @@ async function deleteFoodEntry(id, dateStr) {
   await fetch(`/api/food/${id}`,{method:'DELETE'});
   showToast('🗑️ נמחק'); await loadCalendar();
   if(currentDetailDate) showDayDetail(currentDetailDate);
+}
+
+// ── Logs ──────────────────────────────────────────────
+function parseUA(ua) {
+  if (!ua) return '—';
+  if (/iPhone|iPad/.test(ua)) return '📱 iOS';
+  if (/Android/.test(ua)) return '📱 Android';
+  if (/Windows/.test(ua)) return '🖥️ Windows';
+  if (/Mac/.test(ua)) return '🍎 Mac';
+  if (/Linux/.test(ua)) return '🐧 Linux';
+  return '🌐 אחר';
+}
+
+function parseBrowser(ua) {
+  if (!ua) return '—';
+  if (/Edg\//.test(ua)) return 'Edge';
+  if (/Chrome\//.test(ua)) return 'Chrome';
+  if (/Firefox\//.test(ua)) return 'Firefox';
+  if (/Safari\//.test(ua) && !/Chrome/.test(ua)) return 'Safari';
+  return 'אחר';
+}
+
+async function loadLogs() {
+  const logs = await fetch('/api/logs?limit=200').then(r => r.json());
+  const c = document.getElementById('logsTable');
+  if (!logs.length) { c.innerHTML = '<p class="empty-state">אין לוגים עדיין</p>'; return; }
+
+  // Group consecutive same-IP entries within 30 min as one session
+  const sessions = [];
+  let cur = null;
+  for (const log of logs) {
+    const t = new Date(log.created_at);
+    if (!cur || cur.ip !== log.ip || (cur.lastTime - t) > 30*60*1000) {
+      cur = { ip: log.ip, ua: log.user_agent, firstTime: t, lastTime: t, hits: 1 };
+      sessions.push(cur);
+    } else {
+      cur.hits++;
+      if (t < cur.lastTime) cur.lastTime = t;
+    }
+  }
+
+  c.innerHTML = `<div class="table-wrapper"><table>
+    <thead><tr><th>זמן כניסה</th><th>מכשיר</th><th>דפדפן</th><th>IP</th><th>צפיות</th></tr></thead>
+    <tbody>${sessions.map(s => `<tr>
+      <td>${s.firstTime.toLocaleDateString('he-IL')} ${s.firstTime.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</td>
+      <td>${parseUA(s.ua)}</td>
+      <td>${parseBrowser(s.ua)}</td>
+      <td style="font-family:monospace;font-size:.8rem;color:var(--muted)">${s.ip || '—'}</td>
+      <td><span class="src-badge src-manual">${s.hits}</span></td>
+    </tr>`).join('')}</tbody>
+  </table></div>
+  <p style="color:var(--muted);font-size:.8rem;margin-top:10px;text-align:center">${logs.length} אירועים סה"כ · ${sessions.length} כניסות</p>`;
+}
+
+async function clearLogs() {
+  if (!confirm('למחוק את כל הלוגים?')) return;
+  await fetch('/api/logs', { method: 'DELETE' });
+  showToast('🗑️ לוגים נמחקו');
+  loadLogs();
 }
 
 // ── Toast ─────────────────────────────────────────────────

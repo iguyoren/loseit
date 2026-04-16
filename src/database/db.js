@@ -66,6 +66,13 @@ async function _initOnce() {
     recorded_at TEXT NOT NULL,
     created_at  TIMESTAMPTZ DEFAULT NOW()
   )`);
+  await sql.query(`CREATE TABLE IF NOT EXISTS access_logs (
+    id         SERIAL PRIMARY KEY,
+    ip         TEXT,
+    user_agent TEXT,
+    path       TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
 }
 
 // Run a query, return all rows

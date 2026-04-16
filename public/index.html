@@ -80,6 +80,7 @@
       <button class="nav-btn active" data-view="dashboard"><span class="nav-icon">🏠</span><span class="nav-label"> דשבורד</span></button>
       <button class="nav-btn" data-view="calendar"><span class="nav-icon">📅</span><span class="nav-label"> לוח שנה</span></button>
       <button class="nav-btn" data-view="history"><span class="nav-icon">📋</span><span class="nav-label"> היסטוריה</span></button>
+      <button class="nav-btn" data-view="logs"><span class="nav-icon">🔍</span><span class="nav-label"> לוגים</span></button>
     </nav>
   </div>
 </header>
@@ -97,6 +98,10 @@
   <button class="mob-nav-btn" data-view="history">
     <span class="mob-icon">📋</span>
     <span class="mob-label">היסטוריה</span>
+  </button>
+  <button class="mob-nav-btn" data-view="logs">
+    <span class="mob-icon">🔍</span>
+    <span class="mob-label">לוגים</span>
   </button>
 </nav>
 
@@ -162,6 +167,17 @@
         <button onclick="closeDayDetail()" class="btn-close">✕</button>
       </div>
       <div id="dayDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- ═══ LOGS ═══ -->
+  <div id="view-logs" class="view">
+    <div class="card">
+      <div class="card-header">
+        <h2>🔍 לוגי כניסות לאתר</h2>
+        <button class="btn-secondary" onclick="clearLogs()" style="font-size:.8rem;padding:6px 14px">🗑️ נקה לוגים</button>
+      </div>
+      <div id="logsTable"></div>
     </div>
   </div>
 
