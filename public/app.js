@@ -109,6 +109,9 @@ function setActiveUserBtn(phone) {
   document.querySelectorAll('.user-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.phone === phone);
   });
+  document.querySelectorAll('.stat-card[data-phone]').forEach(c => {
+    c.classList.toggle('active', c.dataset.phone === phone);
+  });
 }
 
 // ── Stats cards ─────────────────────────────────────────
@@ -132,7 +135,7 @@ function renderStats(stats) {
     const idx2 = allUsers.findIndex(u => u.phone === s.phone);
     const color2 = USER_COLORS[idx2] || USER_COLORS[0];
     const initials2 = s.name.slice(0, 1);
-    return `<div class="stat-card">
+    return `<div class="stat-card" data-phone="${s.phone}" onclick="switchUser('${s.phone}')" style="--uc:${color2}">
       <div class="name">
         <div class="sc-avatar" style="background:${color2}">
           <img src="/images/${s.phone}.png" class="sc-photo"
@@ -147,6 +150,8 @@ function renderStats(stats) {
         <span>עודכן: ${lastDate} · ${s.total_entries||0} מדידות</span></div>
       ${prog}</div>`;
   }).join('');
+  // Sync active state after rendering
+  setActiveUserBtn(calPhone);
 }
 
 // ── Chart with workout row ───────────────────────────────
