@@ -939,20 +939,46 @@ async function deleteFoodEntry(id, dateStr) {
 
 // ── Food Diary ────────────────────────────────────────
 let diaryPhone = '';
+let diaryPhotoStats = {}; // phone → { count, last_photo }
+
+function relativeTime(dateStr) {
+  if (!dateStr) return null;
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  const h = Math.floor(diff / 3600000);
+  const d = Math.floor(diff / 86400000);
+  if (m < 1)  return 'עכשיו';
+  if (m < 60) return `לפני ${m} דק'`;
+  if (h < 24) return `לפני ${h} שעות`;
+  if (d === 1) return 'אתמול';
+  if (d < 7)  return `לפני ${d} ימים`;
+  return new Date(dateStr).toLocaleDateString('he-IL', { day:'numeric', month:'short' });
+}
 
 function renderDiaryUserSwitcher() {
   const sw = document.getElementById('diaryUserSwitcher');
   if (!sw) return;
   sw.innerHTML = allUsers.map((u, i) => {
     const initials = u.name.slice(0, 1);
+    const stats = diaryPhotoStats[u.phone];
+    const countBadge = stats?.count
+      ? `<span class="diary-badge">${stats.count}</span>`
+      : `<span class="diary-badge diary-badge-empty">0</span>`;
+    const lastTime = stats?.last_photo
+      ? `<div class="ub-weight">${relativeTime(stats.last_photo)}</div>`
+      : `<div class="ub-weight" style="color:var(--muted);opacity:.6">אין תמונות</div>`;
     return `<button class="user-btn${diaryPhone === u.phone ? ' active' : ''}" data-phone="${u.phone}"
-      onclick="switchDiaryUser('${u.phone}')" style="--uc:${USER_COLORS[i]}">
+      onclick="switchDiaryUser('${u.phone}')" style="--uc:${USER_COLORS[i]}; position:relative">
       <div class="ub-avatar" style="background:${USER_COLORS[i]}">
         <img src="/images/${u.phone}.png" class="ub-photo" onerror="this.style.display='none'"
           onload="this.parentElement.querySelector('.ub-initials').style.display='none'" />
         <span class="ub-initials">${initials}</span>
       </div>
-      <div class="ub-info"><div class="ub-name">${u.name}</div></div>
+      ${countBadge}
+      <div class="ub-info">
+        <div class="ub-name">${u.name}</div>
+        ${lastTime}
+      </div>
     </button>`;
   }).join('');
 }
@@ -965,6 +991,10 @@ function switchDiaryUser(phone) {
 
 async function loadDiary() {
   if (!diaryPhone && allUsers.length) diaryPhone = allUsers[0].phone;
+  // טען סטטיסטיקות לכל המשתמשים
+  const stats = await fetch('/api/food-photos/stats').then(r => r.json());
+  diaryPhotoStats = {};
+  stats.forEach(s => { diaryPhotoStats[s.user_phone] = { count: parseInt(s.count), last_photo: s.last_photo }; });
   renderDiaryUserSwitcher();
   loadDiaryPhotos();
 }

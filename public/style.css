@@ -375,6 +375,20 @@ tr:hover td { background: rgba(99,102,241,.03); }
 /* ── Mobile bottom nav ── */
 .mobile-nav { display: none; }
 
+/* ── Diary user badge ── */
+.diary-badge {
+  position: absolute; top: -6px; right: -6px;
+  background: var(--accent); color: #fff;
+  font-size: .65rem; font-weight: 800;
+  min-width: 20px; height: 20px; border-radius: 99px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 5px; border: 2px solid var(--surface);
+  z-index: 2; line-height: 1;
+}
+.diary-badge-empty {
+  background: var(--border); color: var(--muted);
+}
+
 /* ── Food Diary ── */
 .diary-toolbar { margin-bottom: 16px; }
 .diary-day { margin-bottom: 0; }

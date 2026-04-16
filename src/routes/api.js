@@ -195,6 +195,14 @@ router.post('/ingest', async (req, res) => {
 });
 
 // ── Food Photos ────────────────────────────────────────
+router.get('/food-photos/stats', async (req, res) => {
+  const rows = await db.q(
+    `SELECT user_phone, COUNT(*) as count, MAX(recorded_at) as last_photo
+     FROM food_photos GROUP BY user_phone`
+  );
+  res.json(rows);
+});
+
 router.get('/food-photos', async (req, res) => {
   const { phone, limit = 100 } = req.query;
   const lim = Math.min(parseInt(limit) || 100, 300);
