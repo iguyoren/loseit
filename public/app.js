@@ -254,7 +254,12 @@ async function renderChart() {
   // הגדר גובה לפי מספר שורות (ימים בחודש / נקודות נתונים)
   const canvas = document.getElementById('weightChart');
   const rowCount = activePeriod === 0 ? (labels ? labels.length : 31) : Math.min(allEntries.length, 60);
-  canvas.style.height = Math.max(480, rowCount * 30) + 'px';
+  const chartH = Math.max(520, rowCount * 38);
+  canvas.style.height = chartH + 'px';
+  canvas.style.minHeight = chartH + 'px';
+  // הגבה את ה-wrapper כדי ש-Chart.js יכבד את הגובה
+  const wrapper = canvas.parentElement;
+  if (wrapper) { wrapper.style.height = chartH + 'px'; wrapper.style.minHeight = chartH + 'px'; }
   const ctx = canvas.getContext('2d');
   const colors = USER_COLORS;
 
