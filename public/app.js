@@ -231,8 +231,8 @@ async function renderChart() {
     const daysInMonth = new Date(y, m+1, 0).getDate();
     fromDate = new Date(y, m, 1);
     toDate   = new Date(y, m, daysInMonth);
-    // labels = "1", "2", ... "31"  (day number only — cleaner)
-    labels = Array.from({length: daysInMonth}, (_,i) => `${i+1}`);
+    // labels = "30", "29", ... "1" — 30 בראש, 1 בתחתית
+    labels = Array.from({length: daysInMonth}, (_,i) => `${daysInMonth - i}`);
   } else {
     fromDate = new Date(); fromDate.setDate(fromDate.getDate() - activePeriod);
     toDate   = new Date();
@@ -278,7 +278,8 @@ async function renderChart() {
         if (entryByDate[d] === undefined) entryByDate[d] = e.weight;
       });
       const data = Array.from({length: labels.length}, (_,idx) => {
-        const d = `${y}-${String(m+1).padStart(2,'0')}-${String(idx+1).padStart(2,'0')}`;
+        const day = daysInMonth - idx; // idx=0 → יום אחרון, idx=n-1 → יום 1
+        const d = `${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
         return entryByDate[d] ?? null;
       });
       return {
@@ -337,10 +338,10 @@ async function renderChart() {
         tooltip: { callbacks: {
           title: (items) => {
             if (activePeriod === 0 && labels) {
-              const now = new Date();
-              const m = now.getMonth(), y = now.getFullYear();
+              const now2 = new Date();
+              const m2 = now2.getMonth(), y2 = now2.getFullYear();
               const day = parseInt(labels[items[0].dataIndex]);
-              return new Date(y, m, day).toLocaleDateString('he-IL', { day:'numeric', month:'long' });
+              return new Date(y2, m2, day).toLocaleDateString('he-IL', { day:'numeric', month:'long' });
             }
             return items[0]?.label || '';
           },
@@ -354,7 +355,6 @@ async function renderChart() {
           grid:{ color:'#e2e8f0' },
         },
         y: {
-          reverse: true,
           ticks:{
             color:'#64748b', font:{size:10},
             autoSkip: false,
