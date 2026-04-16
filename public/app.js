@@ -1,5 +1,5 @@
 // ── State ──────────────────────────────────────────────
-let allEntries = [], allUsers = [], allFoodEntries = [], chart = null;
+let allEntries = [], allUsers = [], allFoodEntries = [], allSteps = [], chart = null;
 let activePeriod = 0; // 0 = this month
 let calYear, calMonth, calPhone = '', calData = [];
 let currentDetailDate = null;
@@ -51,12 +51,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Load ────────────────────────────────────────────────
 async function loadAll() {
-  const [stats, entries, users] = await Promise.all([
+  const [stats, entries, users, steps] = await Promise.all([
     fetch('/api/stats').then(r=>r.json()),
     fetch('/api/entries?limit=500').then(r=>r.json()),
     fetch('/api/users').then(r=>r.json()),
+    fetch('/api/steps?phone=972584320320&limit=90').then(r=>r.json()).catch(()=>[]),
   ]);
-  allEntries = entries; allUsers = users;
+  allEntries = entries; allUsers = users; allSteps = steps;
   if (users.length && !calPhone) calPhone = users[0].phone;
   // Load food for all users
   const foodPromises = users.map(u => fetch(`/api/food?phone=${u.phone}&limit=500`).then(r=>r.json()).then(foods=>foods.map(f=>({...f,name:u.name}))));
@@ -154,6 +155,69 @@ function renderStats(stats) {
   }).join('');
   // Sync active state after rendering
   setActiveUserBtn(calPhone);
+  renderStepsWidget();
+}
+
+// ── Steps widget ────────────────────────────────────────
+function renderStepsWidget() {
+  const el = document.getElementById('stepsWidget');
+  if (!el) return;
+  if (!allSteps.length) { el.style.display = 'none'; return; }
+  el.style.display = '';
+
+  const today = new Date().toISOString().slice(0, 10);
+  const todayData = allSteps.find(s => s.date === today);
+  const last7 = allSteps.slice(0, 7);
+  const avgSteps = last7.length ? Math.round(last7.reduce((s,d)=>s+d.steps,0)/last7.length) : 0;
+  const goal = 10000;
+
+  const todaySteps = todayData?.steps || 0;
+  const pct = Math.min(100, Math.round(todaySteps / goal * 100));
+  const km = todayData?.distance_km ? `${todayData.distance_km.toFixed(1)} ק"מ` : '';
+
+  // 7-day bar chart
+  const maxS = Math.max(...last7.map(d=>d.steps), goal);
+  const bars = [...last7].reverse().map(d => {
+    const h = Math.round(d.steps / maxS * 48);
+    const isToday = d.date === today;
+    const label = new Date(d.date+'T12:00:00').toLocaleDateString('he-IL',{weekday:'short'});
+    return `<div class="steps-bar-col">
+      <div class="steps-bar-val" style="font-size:.6rem;color:var(--muted)">${d.steps >= 1000 ? (d.steps/1000).toFixed(1)+'k' : d.steps}</div>
+      <div class="steps-bar" style="height:${h}px;background:${isToday?'var(--accent)':'#c7d2fe'};border-radius:4px 4px 0 0"></div>
+      <div class="steps-bar-label">${label}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="card-header">
+      <h2>👟 צעדים — גיא</h2>
+      <button class="btn-secondary" onclick="syncGarmin()" id="btnSyncGarmin" style="font-size:.78rem;padding:5px 12px">🔄 סנכרן</button>
+    </div>
+    <div class="steps-today">
+      <div class="steps-today-num">${todaySteps.toLocaleString()}</div>
+      <div class="steps-today-sub">צעדים היום ${km ? '· '+km : ''}</div>
+      <div class="steps-progress-bar"><div class="steps-progress-fill" style="width:${pct}%"></div></div>
+      <div class="steps-progress-label">${pct}% מהיעד (${goal.toLocaleString()})</div>
+    </div>
+    <div class="steps-avg">ממוצע 7 ימים: <strong>${avgSteps.toLocaleString()}</strong> צעדים</div>
+    <div class="steps-bars">${bars}</div>`;
+}
+
+async function syncGarmin() {
+  const btn = document.getElementById('btnSyncGarmin');
+  if (btn) { btn.textContent = '⏳ מסנכרן...'; btn.disabled = true; }
+  try {
+    const r = await fetch('/api/steps/sync', { method:'POST', headers:{'x-api-key':'loseit_secret_key_change_me'} });
+    const data = await r.json();
+    if (data.ok) {
+      showToast(`✅ סונכרנו ${data.upserted} ימים`);
+      allSteps = await fetch('/api/steps?phone=972584320320&limit=90').then(r=>r.json()).catch(()=>[]);
+      renderStepsWidget();
+    } else {
+      showToast('❌ ' + (data.error || 'שגיאה'));
+    }
+  } catch(e) { showToast('❌ שגיאה בסנכרון'); }
+  if (btn) { btn.textContent = '🔄 סנכרן'; btn.disabled = false; }
 }
 
 // ── Chart with workout row ───────────────────────────────

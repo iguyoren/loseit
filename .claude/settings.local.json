@@ -84,7 +84,8 @@
       "Bash(curl -s -X POST https://loseit-beta.vercel.app/api/ingest -H 'Content-Type: application/json' -H 'x-api-key: loseit_secret_key_change_me' -d '{\"type\":\"weight\",\"phone\":\"972506409176\",\"name\":\"גלגל\",\"data\":{\"weight\":99},\"recorded_at\":\"2099-01-01T00:00:00.000Z\"}')",
       "Bash(curl -s -X POST https://loseit-beta.vercel.app/api/send-message -H 'Content-Type: application/json' -H 'x-api-key: loseit_secret_key_change_me' -d '{\"phone\":\"972506409176\",\"text\":\"👋 היי גלגל! זו הודעת בדיקה מהבוט של LoseIt ✅\"}')",
       "Bash(curl -s \"https://loseit-beta.vercel.app/api/logs?limit=5\")",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(npm show:*)"
     ]
   }
 }

@@ -76,6 +76,15 @@ async function _initOnce() {
   )`);
   // הוסף עמודת user_name אם לא קיימת (מיגרציה)
   await sql.query(`ALTER TABLE access_logs ADD COLUMN IF NOT EXISTS user_name TEXT`);
+  await sql.query(`CREATE TABLE IF NOT EXISTS daily_steps (
+    id          SERIAL PRIMARY KEY,
+    user_phone  TEXT NOT NULL,
+    date        TEXT NOT NULL,
+    steps       INTEGER NOT NULL DEFAULT 0,
+    distance_km REAL,
+    calories    INTEGER,
+    UNIQUE(user_phone, date)
+  )`);
   await sql.query(`CREATE TABLE IF NOT EXISTS food_photos (
     id          SERIAL PRIMARY KEY,
     user_phone  TEXT NOT NULL,

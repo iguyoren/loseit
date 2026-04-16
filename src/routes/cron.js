@@ -122,4 +122,44 @@ router.get('/evening-reminder', async (req, res) => {
   }
 });
 
+// ── GET /api/cron/sync-garmin ─────────────────────────
+// Vercel Cron: 0 21 * * *  →  ~00:00 IDT (סנכרון בחצות)
+router.get('/sync-garmin', async (req, res) => {
+  const authHeader = req.headers['authorization'];
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`)
+    return res.status(401).json({ error: 'Unauthorized' });
+
+  if (!process.env.GARMIN_EMAIL || !process.env.GARMIN_PASSWORD || !process.env.GARMIN_PHONE) {
+    return res.json({ ok: false, message: 'Garmin credentials not configured' });
+  }
+
+  try {
+    await db.init();
+    const { getStepsRange } = require('../services/garmin');
+    const phone = process.env.GARMIN_PHONE;
+
+    // סנכרן 7 ימים אחרונים
+    const today = new Date(Date.now() + 3*60*60*1000).toISOString().slice(0, 10);
+    const weekAgo = new Date(Date.now() + 3*60*60*1000 - 7*86400000).toISOString().slice(0, 10);
+
+    const steps = await getStepsRange(weekAgo, today);
+    let upserted = 0;
+    for (const day of steps) {
+      if (!day.date || !day.steps) continue;
+      await db.run(
+        `INSERT INTO daily_steps (user_phone,date,steps,distance_km,calories)
+         VALUES (?,?,?,?,?)
+         ON CONFLICT(user_phone,date) DO UPDATE SET steps=excluded.steps, distance_km=excluded.distance_km, calories=excluded.calories`,
+        [phone, day.date, day.steps, day.distance_km, day.calories]
+      );
+      upserted++;
+    }
+    console.log(`[Garmin] סונכרנו ${upserted} ימים`);
+    res.json({ ok: true, upserted, days: steps });
+  } catch (err) {
+    console.error('[Garmin] שגיאה:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

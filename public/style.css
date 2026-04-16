@@ -375,6 +375,20 @@ tr:hover td { background: rgba(99,102,241,.03); }
 /* ── Mobile bottom nav ── */
 .mobile-nav { display: none; }
 
+/* ── Steps widget ── */
+.steps-today { text-align: center; padding: 12px 0 8px; }
+.steps-today-num { font-size: 3rem; font-weight: 800; color: var(--accent); line-height: 1; letter-spacing: -.03em; }
+.steps-today-sub { color: var(--muted); font-size: .85rem; margin: 4px 0 12px; }
+.steps-progress-bar { background: #e0e7ff; border-radius: 99px; height: 10px; overflow: hidden; margin: 0 auto; max-width: 280px; }
+.steps-progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #818cf8); border-radius: 99px; transition: width .6s; }
+.steps-progress-label { color: var(--muted); font-size: .78rem; margin-top: 6px; }
+.steps-avg { text-align: center; color: var(--muted); font-size: .82rem; margin: 8px 0 14px; }
+.steps-bars { display: flex; gap: 6px; align-items: flex-end; justify-content: center; height: 80px; padding: 0 8px; }
+.steps-bar-col { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 1; max-width: 52px; }
+.steps-bar { width: 100%; min-height: 4px; transition: height .4s; }
+.steps-bar-label { font-size: .65rem; color: var(--muted); }
+.steps-bar-val { font-size: .6rem; color: var(--muted); min-height: 14px; }
+
 /* ── Diary user badge ── */
 .diary-badge {
   position: absolute; top: -6px; right: -6px;

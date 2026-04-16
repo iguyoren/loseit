@@ -194,6 +194,50 @@ router.post('/ingest', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Steps ──────────────────────────────────────────────
+router.get('/steps', async (req, res) => {
+  const { phone, from, to, limit = 90 } = req.query;
+  if (!phone) return res.status(400).json({ error: 'Missing phone' });
+  if (from && to) {
+    return res.json(await db.q(
+      `SELECT * FROM daily_steps WHERE user_phone=? AND date BETWEEN ? AND ? ORDER BY date DESC`,
+      [phone, from, to]
+    ));
+  }
+  res.json(await db.q(
+    `SELECT * FROM daily_steps WHERE user_phone=? ORDER BY date DESC LIMIT ?`,
+    [phone, Math.min(parseInt(limit)||90, 365)]
+  ));
+});
+
+// סנכרון ידני מהאתר
+router.post('/steps/sync', async (req, res) => {
+  const apiKey = req.headers['x-api-key'];
+  if (process.env.API_KEY && apiKey !== process.env.API_KEY)
+    return res.status(401).json({ error: 'Unauthorized' });
+
+  if (!process.env.GARMIN_EMAIL || !process.env.GARMIN_PASSWORD || !process.env.GARMIN_PHONE)
+    return res.status(400).json({ error: 'Garmin credentials not configured' });
+
+  const { getStepsRange } = require('../services/garmin');
+  const phone = process.env.GARMIN_PHONE;
+  const today = new Date(Date.now() + 3*60*60*1000).toISOString().slice(0, 10);
+  const weekAgo = new Date(Date.now() + 3*60*60*1000 - 7*86400000).toISOString().slice(0, 10);
+
+  const steps = await getStepsRange(weekAgo, today);
+  let upserted = 0;
+  for (const day of steps) {
+    if (!day.date || day.steps == null) continue;
+    await db.run(
+      `INSERT INTO daily_steps (user_phone,date,steps,distance_km,calories) VALUES (?,?,?,?,?)
+       ON CONFLICT(user_phone,date) DO UPDATE SET steps=excluded.steps, distance_km=excluded.distance_km, calories=excluded.calories`,
+      [phone, day.date, day.steps, day.distance_km, day.calories]
+    );
+    upserted++;
+  }
+  res.json({ ok: true, upserted, days: steps });
+});
+
 // ── Food Photos ────────────────────────────────────────
 router.get('/food-photos/stats', async (req, res) => {
   const rows = await db.q(
