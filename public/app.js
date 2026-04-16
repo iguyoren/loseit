@@ -278,7 +278,7 @@ async function renderChart() {
         if (entryByDate[d] === undefined) entryByDate[d] = e.weight;
       });
       const data = Array.from({length: labels.length}, (_,idx) => {
-        const day = daysInMonth - idx; // idx=0 → יום אחרון, idx=n-1 → יום 1
+        const day = labels.length - idx; // idx=0 → יום אחרון, idx=n-1 → יום 1
         const d = `${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
         return entryByDate[d] ?? null;
       });
