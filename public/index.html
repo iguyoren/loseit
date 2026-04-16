@@ -43,8 +43,14 @@
 
 <script>
 (function() {
-  var PASS = '260487';
-  var KEY  = 'loseit_auth';
+  var PASSWORDS = {
+    '260487':  'גיא',
+    '190287':  'שמחה',
+    '1501198': 'גלגל',
+    '200196':  'אוריה',
+  };
+  var KEY = 'loseit_auth';
+  var KEY_USER = 'loseit_user';
   var screen = document.getElementById('passwordScreen');
 
   // אם כבר מאומת בסשן — הסתר מיד
@@ -54,10 +60,18 @@
   }
 
   function tryLogin() {
-    var val = document.getElementById('passwordInput').value;
-    if (val === PASS) {
+    var val = document.getElementById('passwordInput').value.trim();
+    var userName = PASSWORDS[val];
+    if (userName) {
       sessionStorage.setItem(KEY, '1');
+      sessionStorage.setItem(KEY_USER, userName);
       screen.style.display = 'none';
+      // תיעוד כניסה לשרת
+      fetch('/api/log-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_name: userName })
+      }).catch(function(){});
     } else {
       document.getElementById('passwordError').textContent = 'סיסמה שגויה, נסה שוב';
       document.getElementById('passwordInput').value = '';

@@ -957,35 +957,36 @@ function parseBrowser(ua) {
 }
 
 async function loadLogs() {
-  const logs = await fetch('/api/logs?limit=200').then(r => r.json());
+  const logs = await fetch('/api/logs?limit=500').then(r => r.json());
   const c = document.getElementById('logsTable');
   if (!logs.length) { c.innerHTML = '<p class="empty-state">אין לוגים עדיין</p>'; return; }
 
-  // Group consecutive same-IP entries within 30 min as one session
-  const sessions = [];
-  let cur = null;
-  for (const log of logs) {
-    const t = new Date(log.created_at);
-    if (!cur || cur.ip !== log.ip || (cur.lastTime - t) > 30*60*1000) {
-      cur = { ip: log.ip, ua: log.user_agent, firstTime: t, lastTime: t, hits: 1 };
-      sessions.push(cur);
-    } else {
-      cur.hits++;
-      if (t < cur.lastTime) cur.lastTime = t;
-    }
+  // Only show login events (path = '/login') — these have user_name
+  const loginEvents = logs.filter(l => l.path === '/login' && l.user_name);
+
+  const userColors = { 'גיא': '#4f46e5', 'שמחה': '#f43f5e', 'אוריה': '#10b981', 'גלגל': '#f59e0b' };
+
+  if (!loginEvents.length) {
+    c.innerHTML = '<p class="empty-state">אין כניסות מתועדות עדיין — כניסות יירשמו בלוג מהפעם הבאה</p>';
+    return;
   }
 
   c.innerHTML = `<div class="table-wrapper"><table>
-    <thead><tr><th>זמן כניסה</th><th>מכשיר</th><th>דפדפן</th><th>IP</th><th>צפיות</th></tr></thead>
-    <tbody>${sessions.map(s => `<tr>
-      <td>${s.firstTime.toLocaleDateString('he-IL')} ${s.firstTime.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</td>
-      <td>${parseUA(s.ua)}</td>
-      <td>${parseBrowser(s.ua)}</td>
-      <td style="font-family:monospace;font-size:.8rem;color:var(--muted)">${s.ip || '—'}</td>
-      <td><span class="src-badge src-manual">${s.hits}</span></td>
-    </tr>`).join('')}</tbody>
+    <thead><tr><th>משתמש</th><th>תאריך</th><th>שעה</th><th>מכשיר</th><th>דפדפן</th><th>IP</th></tr></thead>
+    <tbody>${loginEvents.map(l => {
+      const dt = new Date(l.created_at);
+      const color = userColors[l.user_name] || '#64748b';
+      return `<tr>
+        <td><span style="font-weight:700;color:${color}">${l.user_name}</span></td>
+        <td>${dt.toLocaleDateString('he-IL')}</td>
+        <td>${dt.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</td>
+        <td>${parseUA(l.user_agent)}</td>
+        <td>${parseBrowser(l.user_agent)}</td>
+        <td style="font-family:monospace;font-size:.8rem;color:var(--muted)">${l.ip || '—'}</td>
+      </tr>`;
+    }).join('')}</tbody>
   </table></div>
-  <p style="color:var(--muted);font-size:.8rem;margin-top:10px;text-align:center">${logs.length} אירועים סה"כ · ${sessions.length} כניסות</p>`;
+  <p style="color:var(--muted);font-size:.8rem;margin-top:10px;text-align:center">${loginEvents.length} כניסות מתועדות</p>`;
 }
 
 async function clearLogs() {

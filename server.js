@@ -22,6 +22,18 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Login logger endpoint ──────────────────────────────────────────
+app.post('/api/log-login', express.json(), async (req, res) => {
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || '';
+  const ua = req.headers['user-agent'] || '';
+  const { user_name } = req.body;
+  if (user_name) {
+    await q('INSERT INTO access_logs (ip, user_agent, path, user_name) VALUES (?,?,?,?)',
+      [ip, ua, '/login', user_name]).catch(() => {});
+  }
+  res.json({ ok: true });
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api',        require('./src/routes/api'));
 app.use('/webhook',    require('./src/routes/webhook'));

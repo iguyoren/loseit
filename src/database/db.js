@@ -71,8 +71,11 @@ async function _initOnce() {
     ip         TEXT,
     user_agent TEXT,
     path       TEXT,
+    user_name  TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
   )`);
+  // הוסף עמודת user_name אם לא קיימת (מיגרציה)
+  await sql.query(`ALTER TABLE access_logs ADD COLUMN IF NOT EXISTS user_name TEXT`);
 }
 
 // Run a query, return all rows
