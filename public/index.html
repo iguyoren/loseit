@@ -94,6 +94,7 @@
       <button class="nav-btn active" data-view="dashboard"><span class="nav-icon">🏠</span><span class="nav-label"> דשבורד</span></button>
       <button class="nav-btn" data-view="calendar"><span class="nav-icon">📅</span><span class="nav-label"> לוח שנה</span></button>
       <button class="nav-btn" data-view="history"><span class="nav-icon">📋</span><span class="nav-label"> היסטוריה</span></button>
+      <button class="nav-btn" data-view="diary"><span class="nav-icon">📷</span><span class="nav-label"> יומן אכילה</span></button>
       <button class="nav-btn" data-view="logs"><span class="nav-icon">🔍</span><span class="nav-label"> לוגים</span></button>
     </nav>
   </div>
@@ -112,6 +113,10 @@
   <button class="mob-nav-btn" data-view="history">
     <span class="mob-icon">📋</span>
     <span class="mob-label">היסטוריה</span>
+  </button>
+  <button class="mob-nav-btn" data-view="diary">
+    <span class="mob-icon">📷</span>
+    <span class="mob-label">יומן</span>
   </button>
   <button class="mob-nav-btn" data-view="logs">
     <span class="mob-icon">🔍</span>
@@ -182,6 +187,14 @@
       </div>
       <div id="dayDetailBody"></div>
     </div>
+  </div>
+
+  <!-- ═══ FOOD DIARY ═══ -->
+  <div id="view-diary" class="view">
+    <div class="diary-toolbar">
+      <div id="diaryUserSwitcher" class="user-switcher small"></div>
+    </div>
+    <div id="diaryContent"></div>
   </div>
 
   <!-- ═══ LOGS ═══ -->
@@ -278,6 +291,13 @@
       <button onclick="saveWeightEdit()" class="btn-primary">שמור</button>
     </div>
   </div>
+</div>
+
+<!-- Photo Lightbox -->
+<div id="photoLightbox" class="lightbox hidden" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightboxImg" src="" alt="" onclick="event.stopPropagation()" />
+  <div id="lightboxCaption"></div>
 </div>
 
 <div id="toast"></div>

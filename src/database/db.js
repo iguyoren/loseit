@@ -76,6 +76,15 @@ async function _initOnce() {
   )`);
   // הוסף עמודת user_name אם לא קיימת (מיגרציה)
   await sql.query(`ALTER TABLE access_logs ADD COLUMN IF NOT EXISTS user_name TEXT`);
+  await sql.query(`CREATE TABLE IF NOT EXISTS food_photos (
+    id          SERIAL PRIMARY KEY,
+    user_phone  TEXT NOT NULL,
+    image_data  TEXT NOT NULL,
+    mime_type   TEXT DEFAULT 'image/jpeg',
+    caption     TEXT,
+    recorded_at TEXT NOT NULL,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+  )`);
 }
 
 // Run a query, return all rows

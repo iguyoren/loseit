@@ -2,7 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const db      = require('../database/db');
 const { parseMessage, formatWeight } = require('../services/parser');
-const { sendMessage, extractMessage } = require('../services/whatsapp');
+const { sendMessage, extractMessage, downloadMedia } = require('../services/whatsapp');
 const { estimateCalories, detectWorkoutType } = require('../services/calories');
 
 function loadUsersFromEnv() {
@@ -43,11 +43,28 @@ router.post('/', async (req, res) => {
     const msg = extractMessage(req.body);
     if (!msg) return res.sendStatus(200);
 
-    console.log(`[Webhook] הודעה מ-${msg.from}: "${msg.text}"`);
-
     const user       = await getOrCreateUser(msg.from, msg.senderName);
     const recordedAt = msg.timestamp;
-    const parsed     = parseMessage(msg.text);
+
+    // ── תמונת אוכל ──────────────────────────────────────────────
+    if (msg.type === 'image') {
+      console.log(`[Webhook] תמונה מ-${msg.from}`);
+      try {
+        const imageData = await downloadMedia(msg.mediaId);
+        await db.run(
+          'INSERT INTO food_photos (user_phone,image_data,mime_type,caption,recorded_at) VALUES (?,?,?,?,?)',
+          [msg.from, imageData, msg.mimeType || 'image/jpeg', msg.caption || null, recordedAt]
+        );
+        await sendMessage(msg.from, `📸 תמונה נשמרה ביומן האכילה שלך!`);
+      } catch (err) {
+        console.error('[Webhook] שגיאה בשמירת תמונה:', err.message);
+        await sendMessage(msg.from, `❌ לא הצלחנו לשמור את התמונה`);
+      }
+      return res.sendStatus(200);
+    }
+
+    console.log(`[Webhook] הודעה מ-${msg.from}: "${msg.text}"`);
+    const parsed = parseMessage(msg.text);
 
     if (!parsed) {
       await sendMessage(msg.from,

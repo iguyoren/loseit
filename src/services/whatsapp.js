@@ -43,20 +43,43 @@ function extractMessage(body) {
     const value = change?.value;
     const message = value?.messages?.[0];
 
-    if (!message || message.type !== 'text') return null;
+    if (!message) return null;
 
     const contact = value?.contacts?.[0];
-
-    return {
+    const base = {
       messageId: message.id,
-      from: message.from,                          // phone number
-      senderName: contact?.profile?.name || null,  // WhatsApp display name
-      text: message.text.body,
+      from: message.from,
+      senderName: contact?.profile?.name || null,
       timestamp: new Date(parseInt(message.timestamp) * 1000).toISOString(),
+      type: message.type,
     };
+
+    if (message.type === 'text') {
+      return { ...base, text: message.text.body };
+    }
+    if (message.type === 'image') {
+      return { ...base, text: null, mediaId: message.image.id, mimeType: message.image.mime_type || 'image/jpeg', caption: message.image.caption || null };
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
-module.exports = { sendMessage, extractMessage };
+async function downloadMedia(mediaId) {
+  const token = process.env.WHATSAPP_TOKEN;
+  // 1. Get media URL
+  const infoRes = await axios.get(
+    `${BASE_URL}/${mediaId}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  const mediaUrl = infoRes.data.url;
+  // 2. Download the actual bytes
+  const imgRes = await axios.get(mediaUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+    responseType: 'arraybuffer',
+  });
+  return Buffer.from(imgRes.data).toString('base64');
+}
+
+module.exports = { sendMessage, extractMessage, downloadMedia };

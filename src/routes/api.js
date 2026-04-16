@@ -194,6 +194,33 @@ router.post('/ingest', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Food Photos ────────────────────────────────────────
+router.get('/food-photos', async (req, res) => {
+  const { phone, limit = 100 } = req.query;
+  const lim = Math.min(parseInt(limit) || 100, 300);
+  if (!phone) return res.status(400).json({ error: 'Missing phone' });
+  const rows = await db.q(
+    `SELECT id, user_phone, mime_type, caption, recorded_at, created_at
+     FROM food_photos WHERE user_phone=? ORDER BY recorded_at DESC LIMIT ?`,
+    [phone, lim]
+  );
+  res.json(rows);
+});
+
+router.get('/food-photos/:id/image', async (req, res) => {
+  const row = await db.q1('SELECT image_data, mime_type FROM food_photos WHERE id=?', [parseInt(req.params.id)]);
+  if (!row) return res.status(404).send('Not found');
+  const buf = Buffer.from(row.image_data, 'base64');
+  res.set('Content-Type', row.mime_type || 'image/jpeg');
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.send(buf);
+});
+
+router.delete('/food-photos/:id', async (req, res) => {
+  await db.run('DELETE FROM food_photos WHERE id=?', [parseInt(req.params.id)]);
+  res.json({ ok: true });
+});
+
 // ── Access logs ────────────────────────────────────────
 router.get('/logs', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 200, 500);

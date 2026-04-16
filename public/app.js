@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById(`view-${view}`).classList.add('active');
     window.scrollTo(0, 0);
     if (view === 'calendar' && calPhone) loadCalendar();
+    if (view === 'diary') loadDiary();
     if (view === 'logs') loadLogs();
   }
 
@@ -934,6 +935,104 @@ async function deleteFoodEntry(id, dateStr) {
   await fetch(`/api/food/${id}`,{method:'DELETE'});
   showToast('🗑️ נמחק'); await loadCalendar();
   if(currentDetailDate) showDayDetail(currentDetailDate);
+}
+
+// ── Food Diary ────────────────────────────────────────
+let diaryPhone = '';
+
+function renderDiaryUserSwitcher() {
+  const sw = document.getElementById('diaryUserSwitcher');
+  if (!sw) return;
+  sw.innerHTML = allUsers.map((u, i) => {
+    const initials = u.name.slice(0, 1);
+    return `<button class="user-btn${diaryPhone === u.phone ? ' active' : ''}" data-phone="${u.phone}"
+      onclick="switchDiaryUser('${u.phone}')" style="--uc:${USER_COLORS[i]}">
+      <div class="ub-avatar" style="background:${USER_COLORS[i]}">
+        <img src="/images/${u.phone}.png" class="ub-photo" onerror="this.style.display='none'"
+          onload="this.parentElement.querySelector('.ub-initials').style.display='none'" />
+        <span class="ub-initials">${initials}</span>
+      </div>
+      <div class="ub-info"><div class="ub-name">${u.name}</div></div>
+    </button>`;
+  }).join('');
+}
+
+function switchDiaryUser(phone) {
+  diaryPhone = phone;
+  renderDiaryUserSwitcher();
+  loadDiaryPhotos();
+}
+
+async function loadDiary() {
+  if (!diaryPhone && allUsers.length) diaryPhone = allUsers[0].phone;
+  renderDiaryUserSwitcher();
+  loadDiaryPhotos();
+}
+
+async function loadDiaryPhotos() {
+  const c = document.getElementById('diaryContent');
+  if (!diaryPhone) { c.innerHTML = '<p class="empty-state">בחר משתמש</p>'; return; }
+  c.innerHTML = '<p class="empty-state">טוען...</p>';
+
+  const photos = await fetch(`/api/food-photos?phone=${diaryPhone}&limit=200`).then(r => r.json());
+  if (!photos.length) {
+    c.innerHTML = `<div class="card" style="text-align:center;padding:48px">
+      <div style="font-size:3rem;margin-bottom:16px">📷</div>
+      <p style="color:var(--muted)">אין תמונות עדיין</p>
+      <p style="color:var(--muted);font-size:.85rem;margin-top:8px">שלח/י תמונת אוכל בוואטצאפ ותופיע כאן אוטומטית</p>
+    </div>`;
+    return;
+  }
+
+  // Group photos by date
+  const byDate = {};
+  photos.forEach(p => {
+    const date = p.recorded_at.slice(0, 10);
+    if (!byDate[date]) byDate[date] = [];
+    byDate[date].push(p);
+  });
+
+  const datesHtml = Object.entries(byDate).map(([date, ps]) => {
+    const dt = new Date(date + 'T12:00:00');
+    const dateLabel = dt.toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long' });
+    const photosHtml = ps.map(p => {
+      const time = new Date(p.recorded_at).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+      return `<div class="diary-photo-wrap">
+        <img src="/api/food-photos/${p.id}/image" class="diary-photo"
+          loading="lazy"
+          onclick="openLightbox('/api/food-photos/${p.id}/image','${(p.caption||'').replace(/'/g,"&#39;")}')"
+          alt="${p.caption || 'תמונת אוכל'}" />
+        <div class="diary-photo-time">${time}</div>
+        ${p.caption ? `<div class="diary-photo-caption">${p.caption}</div>` : ''}
+        <button class="diary-photo-delete" onclick="deleteDiaryPhoto(${p.id})" title="מחק">🗑️</button>
+      </div>`;
+    }).join('');
+    return `<div class="card diary-day">
+      <div class="diary-date-label">📅 ${dateLabel} <span class="diary-count">${ps.length} תמונות</span></div>
+      <div class="diary-photos-grid">${photosHtml}</div>
+    </div>`;
+  }).join('');
+
+  c.innerHTML = datesHtml;
+}
+
+async function deleteDiaryPhoto(id) {
+  if (!confirm('למחוק תמונה זו?')) return;
+  await fetch(`/api/food-photos/${id}`, { method: 'DELETE' });
+  showToast('🗑️ נמחקה');
+  loadDiaryPhotos();
+}
+
+function openLightbox(src, caption) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightboxCaption').textContent = caption || '';
+  document.getElementById('photoLightbox').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+  document.getElementById('photoLightbox').classList.add('hidden');
+  document.body.style.overflow = '';
 }
 
 // ── Logs ──────────────────────────────────────────────
