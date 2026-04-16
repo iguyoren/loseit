@@ -231,8 +231,8 @@ async function renderChart() {
     const daysInMonth = new Date(y, m+1, 0).getDate();
     fromDate = new Date(y, m, 1);
     toDate   = new Date(y, m, daysInMonth);
-    // labels = "1/4", "2/4", ...
-    labels = Array.from({length: daysInMonth}, (_,i) => `${i+1}/${m+1}`);
+    // labels = "1", "2", ... "31"  (day number only — cleaner)
+    labels = Array.from({length: daysInMonth}, (_,i) => `${i+1}`);
   } else {
     fromDate = new Date(); fromDate.setDate(fromDate.getDate() - activePeriod);
     toDate   = new Date();
@@ -254,7 +254,7 @@ async function renderChart() {
   // הגדר גובה לפי מספר שורות (ימים בחודש / נקודות נתונים)
   const canvas = document.getElementById('weightChart');
   const rowCount = activePeriod === 0 ? (labels ? labels.length : 31) : Math.min(allEntries.length, 60);
-  canvas.style.height = Math.max(420, rowCount * 22) + 'px';
+  canvas.style.height = Math.max(480, rowCount * 30) + 'px';
   const ctx = canvas.getContext('2d');
   const colors = USER_COLORS;
 
@@ -330,6 +330,15 @@ async function renderChart() {
       plugins: {
         legend: { labels: { color:'#1e293b', font:{size:13} } },
         tooltip: { callbacks: {
+          title: (items) => {
+            if (activePeriod === 0 && labels) {
+              const now = new Date();
+              const m = now.getMonth(), y = now.getFullYear();
+              const day = parseInt(labels[items[0].dataIndex]);
+              return new Date(y, m, day).toLocaleDateString('he-IL', { day:'numeric', month:'long' });
+            }
+            return items[0]?.label || '';
+          },
           label: c => `${c.dataset.label}: ${(c.parsed.x ?? c.parsed.y)?.toFixed(1) || '—'} ק"ג`
         }},
       },
