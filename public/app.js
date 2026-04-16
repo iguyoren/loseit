@@ -254,7 +254,7 @@ async function renderChart() {
   // הגדר גובה לפי מספר שורות (ימים בחודש / נקודות נתונים)
   const canvas = document.getElementById('weightChart');
   const rowCount = activePeriod === 0 ? (labels ? labels.length : 31) : Math.min(allEntries.length, 60);
-  const chartH = Math.max(520, rowCount * 38);
+  const chartH = Math.max(400, rowCount * 20);
   canvas.style.height = chartH + 'px';
   canvas.style.minHeight = chartH + 'px';
   // הגבה את ה-wrapper כדי ש-Chart.js יכבד את הגובה
@@ -356,9 +356,10 @@ async function renderChart() {
         y: {
           reverse: true,
           ticks:{
-            color:'#64748b', font:{size:11},
+            color:'#64748b', font:{size:10},
             autoSkip: false,
             maxTicksLimit: 31,
+            padding: 2,
             callback: (val, idx) => activePeriod === 0 ? labels[idx] : val,
           },
           grid:{ color:'#e2e8f0' },
