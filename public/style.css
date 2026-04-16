@@ -384,7 +384,9 @@ tr:hover td { background: rgba(99,102,241,.03); }
   justify-content: space-around; align-items: stretch; gap: 2px;
 }
 .mob-nav-btn {
-  flex: 1; background: none; border: none; cursor: pointer;
+  flex: 1; background: none; border: none; outline: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 3px; padding: 6px 4px; border-radius: 12px;
   color: var(--muted); transition: all .18s; min-width: 0;
@@ -524,17 +526,15 @@ tr:hover td { background: rgba(99,102,241,.03); }
   .card-header { margin-bottom: 12px; gap: 8px; flex-wrap: wrap; }
   .card-header h2 { font-size: .93rem; }
 
-  /* ── User switcher — horizontal scroll ── */
+  /* ── User switcher — 2×2 grid ── */
   #userSwitcher { display: none; }
   .user-switcher {
-    display: flex; gap: 8px;
-    overflow-x: auto; -webkit-overflow-scrolling: touch;
-    padding-bottom: 4px; width: 100%;
-    scrollbar-width: none;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px; width: 100%;
   }
-  .user-switcher::-webkit-scrollbar { display: none; }
   .user-btn {
-    flex-shrink: 0; min-width: 100px; padding: 9px 12px;
+    min-width: 0; width: 100%; padding: 9px 12px;
     border-radius: 12px; gap: 8px;
   }
   .ub-avatar { width: 34px; height: 34px; font-size: .9rem; }
