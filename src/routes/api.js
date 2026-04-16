@@ -194,4 +194,16 @@ router.post('/ingest', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Send test message ──────────────────────────────────
+router.post('/send-message', async (req, res) => {
+  const apiKey = req.headers['x-api-key'];
+  if (process.env.API_KEY && apiKey !== process.env.API_KEY)
+    return res.status(401).json({ error: 'Unauthorized' });
+  const { phone, text } = req.body;
+  if (!phone || !text) return res.status(400).json({ error: 'Missing phone or text' });
+  const { sendMessage } = require('../services/whatsapp');
+  await sendMessage(phone, text);
+  res.json({ ok: true });
+});
+
 module.exports = router;
