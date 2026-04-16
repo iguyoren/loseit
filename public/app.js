@@ -251,7 +251,11 @@ async function renderChart() {
     wks.forEach(w => { workoutsByUser[u.phone][w.recorded_at.slice(0,10)] = w.type; });
   }));
 
-  const ctx = document.getElementById('weightChart').getContext('2d');
+  // הגדר גובה לפי מספר שורות (ימים בחודש / נקודות נתונים)
+  const canvas = document.getElementById('weightChart');
+  const rowCount = activePeriod === 0 ? (labels ? labels.length : 31) : Math.min(allEntries.length, 60);
+  canvas.style.height = Math.max(420, rowCount * 22) + 'px';
+  const ctx = canvas.getContext('2d');
   const colors = USER_COLORS;
 
   let datasets;
@@ -321,6 +325,7 @@ async function renderChart() {
     options: {
       indexAxis: 'y',
       responsive: true,
+      maintainAspectRatio: false,
       interaction: { mode:'index', intersect:false },
       plugins: {
         legend: { labels: { color:'#1e293b', font:{size:13} } },
@@ -338,6 +343,8 @@ async function renderChart() {
           reverse: true,
           ticks:{
             color:'#64748b', font:{size:11},
+            autoSkip: false,
+            maxTicksLimit: 31,
             callback: (val, idx) => activePeriod === 0 ? labels[idx] : val,
           },
           grid:{ color:'#e2e8f0' },
