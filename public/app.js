@@ -122,12 +122,22 @@ function renderStats(stats) {
   const c = document.getElementById('stats-cards');
   if (!stats.length) { c.innerHTML='<p class="empty-state">אין נתונים — שלח משקל בוואטצאפ! 📱</p>'; return; }
   c.innerHTML = stats.map(s => {
-    const latest = allEntries.find(e=>e.user_phone===s.phone);
-    const prev   = allEntries.filter(e=>e.user_phone===s.phone)[1];
+    const userEntries = allEntries.filter(e=>e.user_phone===s.phone);
+    const latest = userEntries[0];
+    const firstEntry = userEntries[userEntries.length - 1];
+
+    // שינוי ממדידה קודמת
+    const prev   = userEntries[1];
     const diff   = latest&&prev ? (latest.weight-prev.weight).toFixed(1) : null;
     const cls    = diff>0?'up':diff<0?'down':'flat';
     const arrow  = diff>0?'⬆️':diff<0?'⬇️':'➡️';
     const diffTxt= diff!==null?`${diff>0?'+':''}${diff} ק"ג`:'מדידה ראשונה';
+
+    // שינוי כולל מהמשקל הראשוני (מספיק 2+ רשומות)
+    const totalDiff = (userEntries.length >= 2 && latest && firstEntry)
+      ? +(latest.weight - firstEntry.weight).toFixed(1)
+      : null;
+
     let prog = '';
     if (s.target_weight&&latest) {
       const done = Math.min(100,Math.max(0,Math.abs((s.max_weight||latest.weight)-latest.weight)/Math.abs((s.max_weight||latest.weight)-s.target_weight)*100));
@@ -138,6 +148,29 @@ function renderStats(stats) {
     const idx2 = allUsers.findIndex(u => u.phone === s.phone);
     const color2 = USER_COLORS[idx2] || USER_COLORS[0];
     const initials2 = s.name.slice(0, 1);
+
+    // Journey row — מהמשקל הראשוני לעכשיו
+    const journeyHtml = totalDiff !== null ? (() => {
+      const isDown = totalDiff < 0;
+      const journeyCls = isDown ? 'wj-down' : 'wj-up';
+      const journeyIcon = isDown ? '↓' : '↑';
+      const journeyDiff = `${totalDiff > 0 ? '+' : ''}${totalDiff} ק"ג`;
+      return `<div class="weight-journey">
+        <div class="wj-block">
+          <span class="wj-lbl">התחלה</span>
+          <span class="wj-num">${firstEntry.weight.toFixed(1)}<span class="wj-unit"> ק"ג</span></span>
+        </div>
+        <div class="wj-mid ${journeyCls}">
+          <span class="wj-icon">${journeyIcon}</span>
+          <span class="wj-diff">${journeyDiff}</span>
+        </div>
+        <div class="wj-block">
+          <span class="wj-lbl">עכשיו</span>
+          <span class="wj-num">${latest.weight.toFixed(1)}<span class="wj-unit"> ק"ג</span></span>
+        </div>
+      </div>`;
+    })() : '';
+
     return `<div class="stat-card" data-phone="${s.phone}" onclick="switchUser('${s.phone}')" style="--uc:${color2}">
       <div class="name">
         <div class="sc-avatar" style="background:${color2}">
@@ -149,6 +182,7 @@ function renderStats(stats) {
         ${s.name}
       </div>
       <div class="current-weight">${latest?latest.weight.toFixed(1):'—'} <small>ק"ג</small></div>
+      ${journeyHtml}
       <div class="meta"><span class="change ${cls}">${diff!==null?arrow:''} ${diffTxt}</span>
         <span>עודכן: ${lastDate} · ${s.total_entries||0} מדידות</span></div>
       ${prog}</div>`;
@@ -231,8 +265,8 @@ async function renderChart() {
     const daysInMonth = new Date(y, m+1, 0).getDate();
     fromDate = new Date(y, m, 1);
     toDate   = new Date(y, m, daysInMonth);
-    // labels = "30", "29", ... "1" — 30 בראש, 1 בתחתית
-    labels = Array.from({length: daysInMonth}, (_,i) => `${daysInMonth - i}`);
+    // labels = "1", "2", ... "30" — 1 בראש, 30 בתחתית (זמן מלמעלה למטה)
+    labels = Array.from({length: daysInMonth}, (_,i) => `${i + 1}`);
   } else {
     fromDate = new Date(); fromDate.setDate(fromDate.getDate() - activePeriod);
     toDate   = new Date();
@@ -278,7 +312,7 @@ async function renderChart() {
         if (entryByDate[d] === undefined) entryByDate[d] = e.weight;
       });
       const data = Array.from({length: labels.length}, (_,idx) => {
-        const day = labels.length - idx; // idx=0 → יום אחרון, idx=n-1 → יום 1
+        const day = idx + 1; // idx=0 → יום 1, idx=n-1 → יום אחרון
         const d = `${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
         return entryByDate[d] ?? null;
       });
@@ -316,15 +350,6 @@ async function renderChart() {
 
   if (chart) chart.destroy();
 
-  // חישוב טווח ציר Y אוטומטי לפי הנתונים
-  const allWeights = datasets.flatMap(ds =>
-    Array.isArray(ds.data)
-      ? ds.data.filter(v => v !== null && typeof v === 'number')
-      : ds.data.map(p => p.y).filter(v => v != null)
-  );
-  const yMin = allWeights.length ? Math.floor(Math.min(...allWeights) - 2) : 40;
-  const yMax = allWeights.length ? Math.ceil(Math.max(...allWeights)  + 2) : 120;
-
   chart = new Chart(ctx, {
     type: 'line',
     data: { labels: labels||undefined, datasets },
@@ -350,8 +375,14 @@ async function renderChart() {
       },
       scales: {
         x: {
-          min: yMin, max: yMax,
-          ticks:{ color:'#64748b', callback: v=>`${v} ק"ג` },
+          min: 65,
+          max: 100,
+          reverse: true,   // 100 בראשית הציר (שמאל), 65 בסוף (ימין)
+          ticks:{
+            color:'#64748b',
+            stepSize: 5,
+            callback: v => `${v} ק"ג`,
+          },
           grid:{ color:'#e2e8f0' },
         },
         y: {
