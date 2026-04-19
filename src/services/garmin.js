@@ -25,13 +25,12 @@ async function getClient() {
 // משתמש ב-getSteps(date) שמחזיר מספר שלם של צעדים
 async function getStepsForDate(dateStr) {
   const client = await getClient();
-  const date   = new Date(dateStr + 'T12:00:00');
-  const steps  = await client.getSteps(date);
+  const steps  = await client.getSteps(new Date(dateStr + 'T12:00:00'));
   if (steps == null) return null;
   return {
-    date,
+    date:        dateStr,   // ← string YYYY-MM-DD ולא Date object
     steps:       steps || 0,
-    distance_km: steps ? +(steps * 0.00075).toFixed(2) : null, // ~0.75m לצעד
+    distance_km: steps ? +(steps * 0.00075).toFixed(2) : null,
     calories:    null,
   };
 }
