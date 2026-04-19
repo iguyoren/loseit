@@ -215,6 +215,8 @@ router.get('/steps/refresh', async (req, res) => {
   const phone = process.env.GARMIN_PHONE;
   if (!phone) return res.status(400).json({ error: 'GARMIN_PHONE not configured' });
 
+  let syncError = null;
+
   // נסה לסנכרן מגארמין (אם אישורים קיימים)
   if (process.env.GARMIN_EMAIL && process.env.GARMIN_PASSWORD) {
     try {
@@ -233,8 +235,8 @@ router.get('/steps/refresh', async (req, res) => {
         console.log(`[Steps] סונכרן יום ${today}: ${dayData.steps} צעדים`);
       }
     } catch(e) {
+      syncError = e.message;
       console.error('[Steps] סנכרון נכשל:', e.message);
-      // ממשיכים — מחזירים נתונים מהDB גם אם הסנכרון נכשל
     }
   }
 
@@ -243,7 +245,7 @@ router.get('/steps/refresh', async (req, res) => {
     `SELECT * FROM daily_steps WHERE user_phone=? ORDER BY date DESC LIMIT 30`,
     [phone]
   );
-  res.json({ ok: true, steps: rows });
+  res.json({ ok: true, steps: rows, syncError });
 });
 
 // סנכרון ידני מהאתר
