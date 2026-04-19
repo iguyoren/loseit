@@ -210,6 +210,42 @@ router.get('/steps', async (req, res) => {
   ));
 });
 
+// סנכרון אוטומטי בכל טעינת לשונית — מביא נתון יום נוכחי מגארמין ומחזיר 30 יום
+router.get('/steps/refresh', async (req, res) => {
+  const phone = process.env.GARMIN_PHONE;
+  if (!phone) return res.status(400).json({ error: 'GARMIN_PHONE not configured' });
+
+  // נסה לסנכרן מגארמין (אם אישורים קיימים)
+  if (process.env.GARMIN_EMAIL && process.env.GARMIN_PASSWORD) {
+    try {
+      const { getStepsForDate } = require('../services/garmin');
+      const today = new Date(Date.now() + 3*60*60*1000).toISOString().slice(0, 10);
+      const dayData = await getStepsForDate(today);
+      if (dayData && dayData.steps != null) {
+        await db.run(
+          `INSERT INTO daily_steps (user_phone,date,steps,distance_km,calories) VALUES (?,?,?,?,?)
+           ON CONFLICT(user_phone,date) DO UPDATE SET
+             steps=excluded.steps,
+             distance_km=excluded.distance_km,
+             calories=excluded.calories`,
+          [phone, dayData.date, dayData.steps, dayData.distance_km, dayData.calories]
+        );
+        console.log(`[Steps] סונכרן יום ${today}: ${dayData.steps} צעדים`);
+      }
+    } catch(e) {
+      console.error('[Steps] סנכרון נכשל:', e.message);
+      // ממשיכים — מחזירים נתונים מהDB גם אם הסנכרון נכשל
+    }
+  }
+
+  // מחזיר 30 יום אחרונים מה-DB
+  const rows = await db.q(
+    `SELECT * FROM daily_steps WHERE user_phone=? ORDER BY date DESC LIMIT 30`,
+    [phone]
+  );
+  res.json({ ok: true, steps: rows });
+});
+
 // סנכרון ידני מהאתר
 router.post('/steps/sync', async (req, res) => {
   const apiKey = req.headers['x-api-key'];

@@ -96,6 +96,7 @@
       <button class="nav-btn" data-view="calendar"><span class="nav-icon">📅</span><span class="nav-label"> לוח שנה</span></button>
       <button class="nav-btn" data-view="history"><span class="nav-icon">📋</span><span class="nav-label"> היסטוריה</span></button>
       <button class="nav-btn" data-view="diary"><span class="nav-icon">📷</span><span class="nav-label"> יומן אכילה</span></button>
+      <button class="nav-btn" data-view="steps" id="stepsNavBtn" style="display:none"><span class="nav-icon">👟</span><span class="nav-label"> צעדים</span></button>
       <button class="nav-btn" data-view="logs"><span class="nav-icon">🔍</span><span class="nav-label"> לוגים</span></button>
     </nav>
   </div>
@@ -118,6 +119,10 @@
   <button class="mob-nav-btn" data-view="diary">
     <span class="mob-icon">📷</span>
     <span class="mob-label">יומן</span>
+  </button>
+  <button class="mob-nav-btn" data-view="steps" id="stepsMobBtn" style="display:none">
+    <span class="mob-icon">👟</span>
+    <span class="mob-label">צעדים</span>
   </button>
   <button class="mob-nav-btn" data-view="logs">
     <span class="mob-icon">🔍</span>
@@ -199,6 +204,21 @@
       <div id="diaryUserSwitcher" class="user-switcher small"></div>
     </div>
     <div id="diaryContent"></div>
+  </div>
+
+  <!-- ═══ STEPS (גיא בלבד) ═══ -->
+  <div id="view-steps" class="view">
+    <div class="card" id="stepsToday">
+      <div class="card-header">
+        <h2>👟 צעדים היום — גיא</h2>
+        <button class="btn-secondary" onclick="refreshSteps()" id="btnRefreshSteps" style="font-size:.78rem;padding:5px 12px">🔄 רענן</button>
+      </div>
+      <div id="stepsTodayBody"><p class="empty-state">טוען...</p></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>📊 30 ימים אחרונים</h2></div>
+      <div id="stepsHistory"></div>
+    </div>
   </div>
 
   <!-- ═══ LOGS ═══ -->

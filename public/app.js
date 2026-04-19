@@ -18,10 +18,21 @@ const WORKOUT_EMOJIS = {
 };
 function workoutEmoji(t) { return WORKOUT_EMOJIS[t] || '🏋️'; }
 
+const GUY_PHONE = '972584320320';
+
 // ── Init ────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const now = new Date();
   calYear = now.getFullYear(); calMonth = now.getMonth() + 1;
+
+  // הצג לשונית צעדים רק לגיא
+  const loggedUser = sessionStorage.getItem('loseit_user');
+  if (loggedUser === 'גיא') {
+    const nb = document.getElementById('stepsNavBtn');
+    const mb = document.getElementById('stepsMobBtn');
+    if (nb) nb.style.display = '';
+    if (mb) mb.style.display = '';
+  }
 
   loadAll();
 
@@ -33,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (view === 'calendar' && calPhone) loadCalendar();
     if (view === 'diary') loadDiary();
     if (view === 'logs') loadLogs();
+    if (view === 'steps') loadSteps();
   }
 
   document.querySelectorAll('.nav-btn, .mob-nav-btn').forEach(btn => btn.addEventListener('click', () => navigateTo(btn.dataset.view)));
@@ -1240,6 +1252,89 @@ async function clearLogs() {
   await fetch('/api/logs', { method: 'DELETE' });
   showToast('🗑️ לוגים נמחקו');
   loadLogs();
+}
+
+// ── Steps Tab ─────────────────────────────────────────────
+let stepsData = [];
+
+async function loadSteps() {
+  const todayEl   = document.getElementById('stepsTodayBody');
+  const histEl    = document.getElementById('stepsHistory');
+  if (!todayEl) return;
+
+  todayEl.innerHTML = '<p class="empty-state">מתחבר לגארמין...</p>';
+
+  try {
+    const res  = await fetch('/api/steps/refresh');
+    const json = await res.json();
+    stepsData  = json.steps || [];
+    renderStepsTab();
+  } catch(e) {
+    todayEl.innerHTML = '<p class="empty-state">❌ שגיאה בטעינת נתונים</p>';
+  }
+}
+
+async function refreshSteps() {
+  const btn = document.getElementById('btnRefreshSteps');
+  if (btn) { btn.textContent = '⏳ מסנכרן...'; btn.disabled = true; }
+  await loadSteps();
+  if (btn) { btn.textContent = '🔄 רענן'; btn.disabled = false; }
+  showToast('✅ עודכן מגארמין');
+}
+
+function renderStepsTab() {
+  const todayEl = document.getElementById('stepsTodayBody');
+  const histEl  = document.getElementById('stepsHistory');
+  if (!todayEl) return;
+
+  const todayStr  = new Date(Date.now() + 3*60*60*1000).toISOString().slice(0,10);
+  const todayData = stepsData.find(s => s.date === todayStr);
+  const goal      = 10000;
+  const steps     = todayData?.steps || 0;
+  const pct       = Math.min(100, Math.round(steps / goal * 100));
+  const km        = todayData?.distance_km ? `${(+todayData.distance_km).toFixed(2)} ק"מ` : null;
+  const cal       = todayData?.calories    ? `${todayData.calories} קק"ל` : null;
+
+  // ── כרטיס היום ──
+  todayEl.innerHTML = `
+    <div class="steps-big-row">
+      <div class="steps-big-num">${steps.toLocaleString()}</div>
+      <div class="steps-big-label">צעדים היום</div>
+      ${km  ? `<div class="steps-meta-chip">🛣️ ${km}</div>`  : ''}
+      ${cal ? `<div class="steps-meta-chip">🔥 ${cal}</div>` : ''}
+    </div>
+    <div class="steps-goal-row">
+      <div class="steps-goal-bar">
+        <div class="steps-goal-fill" style="width:${pct}%"></div>
+      </div>
+      <div class="steps-goal-label">${pct}% מהיעד · ${goal.toLocaleString()} צעדים</div>
+    </div>`;
+
+  if (!stepsData.length) {
+    histEl.innerHTML = '<p class="empty-state">אין נתוני היסטוריה עדיין</p>';
+    return;
+  }
+
+  // ── היסטוריה 30 יום ──
+  const maxSteps = Math.max(...stepsData.map(s => s.steps || 0), goal);
+
+  histEl.innerHTML = `<div class="steps-hist-list">
+    ${stepsData.map(s => {
+      const pctBar = Math.min(100, Math.round((s.steps || 0) / maxSteps * 100));
+      const isToday = s.date === todayStr;
+      const dt = new Date(s.date + 'T12:00:00');
+      const label = dt.toLocaleDateString('he-IL', { weekday:'short', day:'numeric', month:'numeric' });
+      const metaKm  = s.distance_km ? ` · ${(+s.distance_km).toFixed(1)} ק"מ` : '';
+      const hitGoal = (s.steps || 0) >= goal;
+      return `<div class="steps-hist-row${isToday ? ' steps-hist-today' : ''}">
+        <div class="steps-hist-label">${isToday ? '📍 היום' : label}</div>
+        <div class="steps-hist-bar-wrap">
+          <div class="steps-hist-bar" style="width:${pctBar}%;background:${hitGoal ? 'var(--green)' : isToday ? 'var(--accent)' : '#c7d2fe'}"></div>
+        </div>
+        <div class="steps-hist-val${hitGoal ? ' steps-goal-hit' : ''}">${(s.steps||0).toLocaleString()}${metaKm}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
 }
 
 // ── Toast ─────────────────────────────────────────────────
