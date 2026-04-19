@@ -22,33 +22,42 @@ async function getClient() {
 }
 
 // מחזיר צעדים ליום ספציפי (YYYY-MM-DD)
+// משתמש ב-getSteps(date) שמחזיר מספר שלם של צעדים
 async function getStepsForDate(dateStr) {
   const client = await getClient();
   const date   = new Date(dateStr + 'T12:00:00');
-  const stats  = await client.getDailySteps(date, date);
-  if (!stats || !stats.length) return null;
-  const day = stats[0];
+  const steps  = await client.getSteps(date);
+  if (steps == null) return null;
   return {
-    date:           dateStr,
-    steps:          day.totalSteps          || 0,
-    distance_km:    day.totalDistance != null ? +(day.totalDistance / 1000).toFixed(2) : null,
-    active_minutes: day.activeKilocalories  != null ? null : null,  // not always available
-    calories:       day.activeKilocalories  || null,
+    date,
+    steps:       steps || 0,
+    distance_km: steps ? +(steps * 0.00075).toFixed(2) : null, // ~0.75m לצעד
+    calories:    null,
   };
 }
 
-// מחזיר רשימת צעדים לטווח תאריכים
+// מחזיר רשימת צעדים לטווח תאריכים (לולאה יומית)
 async function getStepsRange(startDate, endDate) {
-  const client = await getClient();
-  const from   = new Date(startDate + 'T12:00:00');
-  const to     = new Date(endDate   + 'T12:00:00');
-  const stats  = await client.getDailySteps(from, to);
-  return (stats || []).map(day => ({
-    date:        day.calendarDate || day.startGMT?.slice(0, 10),
-    steps:       day.totalSteps   || 0,
-    distance_km: day.totalDistance != null ? +(day.totalDistance / 1000).toFixed(2) : null,
-    calories:    day.activeKilocalories || null,
-  })).filter(d => d.date);
+  const client  = await getClient();
+  const results = [];
+  const start   = new Date(startDate + 'T12:00:00');
+  const end     = new Date(endDate   + 'T12:00:00');
+
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dateStr = d.toISOString().slice(0, 10);
+    try {
+      const steps = await client.getSteps(new Date(d));
+      results.push({
+        date:        dateStr,
+        steps:       steps || 0,
+        distance_km: steps ? +(steps * 0.00075).toFixed(2) : null,
+        calories:    null,
+      });
+    } catch(e) {
+      console.error(`[Garmin] שגיאה ל-${dateStr}:`, e.message);
+    }
+  }
+  return results;
 }
 
 module.exports = { getStepsForDate, getStepsRange };
