@@ -8,6 +8,14 @@ function parseMessage(text) {
   if (!text || typeof text !== 'string') return null;
   const trimmed = text.trim();
 
+  // Pure numeric message (e.g. "85", "85.5", "85,5") → weight
+  // אם המשתמש שלח רק מספר ללא טקסט נוסף — נניח שזה משקל
+  const pureNumber = trimmed.replace(/\s+/g, '').replace(',', '.');
+  if (/^\d{1,3}(\.\d{1,2})?$/.test(pureNumber)) {
+    const w = parseFloat(pureNumber);
+    if (isValidWeight(w)) return { type: 'weight', weight: w, note: null };
+  }
+
   // Full prefixes
   const weightPrefix  = /^(?:משקל|weight)\s*[:：]\s*/i;
   const workoutPrefix = /^(?:אימון|workout|אמרן|ספורט)\s*[:：]\s*/i;
