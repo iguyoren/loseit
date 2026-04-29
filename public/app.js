@@ -360,6 +360,12 @@ async function renderChart() {
 
   if (chart) chart.destroy();
 
+  // טווח ציר Y דינמי: משקל נוכחי ±15 ק"ג
+  const refEntries = calPhone ? allEntries.filter(e => e.user_phone === calPhone) : allEntries;
+  const currentWeight = refEntries.length ? refEntries[0].weight : 80;
+  const yMin = Math.floor(currentWeight) - 15;
+  const yMax = Math.ceil(currentWeight) + 15;
+
   chart = new Chart(ctx, {
     type: 'line',
     data: { labels: labels||undefined, datasets },
@@ -395,11 +401,13 @@ async function renderChart() {
           title:{ display:true, text:'יום בחודש', color:'#64748b', font:{size:12} },
         },
         y: {
-          min: 65,
-          max: 100,
+          min: yMin,
+          max: yMax,
           ticks:{
             color:'#64748b',
-            stepSize: 5,
+            stepSize: 1,
+            font:{size:10},
+            autoSkip: false,
             callback: v => `${v} ק"ג`,
           },
           grid:{ color:'#e2e8f0' },
