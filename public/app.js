@@ -384,7 +384,7 @@ async function renderChart() {
       },
       scales: {
         x: {
-          reverse: true,   // RTL — יום 1 מימין, יום אחרון משמאל
+          // יום 1 בראשית הציר (שמאל), יום אחרון בסוף (ימין) — נתונים חדשים מתווספים מימין
           ticks:{
             color:'#64748b',
             font:{size:11},

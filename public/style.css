@@ -201,7 +201,7 @@ main { max-width: 1100px; margin: 0 auto; padding: 28px 20px; display: flex; fle
 .btn-period.active { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 2px 8px rgba(99,102,241,.35); }
 
 /* Workout icons row */
-.workout-row { display: flex; padding: 8px 0 0; border-top: 1px dashed var(--border); margin-top: 8px; overflow: hidden; }
+.workout-row { display: flex; direction: ltr; padding: 8px 0 0; border-top: 1px dashed var(--border); margin-top: 8px; overflow: hidden; }
 .workout-day { flex: 1; text-align: center; font-size: .85rem; min-width: 0; cursor: default; }
 .workout-day span { display: block; font-size: .62rem; color: var(--muted); }
 
