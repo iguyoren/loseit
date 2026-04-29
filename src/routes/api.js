@@ -210,42 +210,43 @@ router.get('/steps', async (req, res) => {
   ));
 });
 
-// סנכרון אוטומטי בכל טעינת לשונית — מביא נתון יום נוכחי מגארמין ומחזיר 30 יום
+// מחזיר 30 יום אחרונים מה-DB (ללא סנכרון — נתונים מגיעים מ-sync-steps.js)
 router.get('/steps/refresh', async (req, res) => {
   const phone = process.env.GARMIN_PHONE;
   if (!phone) return res.status(400).json({ error: 'GARMIN_PHONE not configured' });
-
-  let syncError = null;
-
-  // נסה לסנכרן מגארמין (אם אישורים קיימים)
-  if (process.env.GARMIN_EMAIL && process.env.GARMIN_PASSWORD) {
-    try {
-      const { getStepsForDate } = require('../services/garmin');
-      const today = new Date(Date.now() + 3*60*60*1000).toISOString().slice(0, 10);
-      const dayData = await getStepsForDate(today);
-      if (dayData && dayData.steps != null) {
-        await db.run(
-          `INSERT INTO daily_steps (user_phone,date,steps,distance_km,calories) VALUES (?,?,?,?,?)
-           ON CONFLICT(user_phone,date) DO UPDATE SET
-             steps=excluded.steps,
-             distance_km=excluded.distance_km,
-             calories=excluded.calories`,
-          [phone, dayData.date, dayData.steps, dayData.distance_km, dayData.calories]
-        );
-        console.log(`[Steps] סונכרן יום ${today}: ${dayData.steps} צעדים`);
-      }
-    } catch(e) {
-      syncError = e.message;
-      console.error('[Steps] סנכרון נכשל:', e.message);
-    }
-  }
-
-  // מחזיר 30 יום אחרונים מה-DB
   const rows = await db.q(
     `SELECT * FROM daily_steps WHERE user_phone=? ORDER BY date DESC LIMIT 30`,
     [phone]
   );
-  res.json({ ok: true, steps: rows, syncError });
+  res.json({ ok: true, steps: rows });
+});
+
+// קבלת נתוני צעדים מה-script המקומי
+router.post('/steps/push', async (req, res) => {
+  const apiKey = req.headers['x-api-key'];
+  if (apiKey !== 'loseit_steps_push') return res.status(401).json({ error: 'Unauthorized' });
+
+  const phone = process.env.GARMIN_PHONE;
+  if (!phone) return res.status(400).json({ error: 'GARMIN_PHONE not configured' });
+
+  const { days } = req.body; // [{ date, steps, distance_km }]
+  if (!Array.isArray(days)) return res.status(400).json({ error: 'days array required' });
+
+  let upserted = 0;
+  for (const d of days) {
+    if (!d.date || d.steps == null) continue;
+    await db.run(
+      `INSERT INTO daily_steps (user_phone,date,steps,distance_km,calories) VALUES (?,?,?,?,?)
+       ON CONFLICT(user_phone,date) DO UPDATE SET
+         steps=excluded.steps,
+         distance_km=excluded.distance_km,
+         calories=excluded.calories`,
+      [phone, d.date, d.steps, d.distance_km ?? null, d.calories ?? null]
+    );
+    upserted++;
+  }
+  console.log(`[Steps/push] upserted ${upserted} days`);
+  res.json({ ok: true, upserted });
 });
 
 // סנכרון ידני מהאתר

@@ -50,6 +50,9 @@
     '200196':  'אוריה',
     '260261':  'שלי',
   };
+  var BLOCKED_USERS = {
+    'גלגל': 'עקב חוסר שיתוף פעולה חשבונך נחסם',
+  };
   var KEY = 'loseit_auth';
   var KEY_USER = 'loseit_user';
   var screen = document.getElementById('passwordScreen');
@@ -64,6 +67,13 @@
     var val = document.getElementById('passwordInput').value.trim();
     var userName = PASSWORDS[val];
     if (userName) {
+      // בדוק אם המשתמש חסום
+      if (BLOCKED_USERS[userName]) {
+        document.getElementById('passwordError').textContent = BLOCKED_USERS[userName];
+        document.getElementById('passwordInput').value = '';
+        document.getElementById('passwordInput').focus();
+        return;
+      }
       sessionStorage.setItem(KEY, '1');
       sessionStorage.setItem(KEY_USER, userName);
       screen.style.display = 'none';
