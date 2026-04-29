@@ -297,13 +297,11 @@ async function renderChart() {
     wks.forEach(w => { workoutsByUser[u.phone][w.recorded_at.slice(0,10)] = w.type; });
   }));
 
-  // הגדר גובה לפי מספר שורות (ימים בחודש / נקודות נתונים)
+  // גובה גרף סטנדרטי (לא תלוי במספר ימים)
   const canvas = document.getElementById('weightChart');
-  const rowCount = activePeriod === 0 ? (labels ? labels.length : 31) : Math.min(allEntries.length, 60);
-  const chartH = Math.max(400, rowCount * 20);
+  const chartH = 380;
   canvas.style.height = chartH + 'px';
   canvas.style.minHeight = chartH + 'px';
-  // הגבה את ה-wrapper כדי ש-Chart.js יכבד את הגובה
   const wrapper = canvas.parentElement;
   if (wrapper) { wrapper.style.height = chartH + 'px'; wrapper.style.minHeight = chartH + 'px'; }
   const ctx = canvas.getContext('2d');
@@ -366,7 +364,6 @@ async function renderChart() {
     type: 'line',
     data: { labels: labels||undefined, datasets },
     options: {
-      indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode:'index', intersect:false },
@@ -382,28 +379,28 @@ async function renderChart() {
             }
             return items[0]?.label || '';
           },
-          label: c => `${c.dataset.label}: ${(c.parsed.x ?? c.parsed.y)?.toFixed(1) || '—'} ק"ג`
+          label: c => `${c.dataset.label}: ${(c.parsed.y ?? c.parsed.x)?.toFixed(1) || '—'} ק"ג`
         }},
       },
       scales: {
         x: {
+          reverse: true,   // RTL — יום 1 מימין, יום אחרון משמאל
+          ticks:{
+            color:'#64748b',
+            font:{size:11},
+            autoSkip: true,
+            maxTicksLimit: 16,
+          },
+          grid:{ color:'#e2e8f0' },
+          title:{ display:true, text:'יום בחודש', color:'#64748b', font:{size:12} },
+        },
+        y: {
           min: 65,
           max: 100,
-          reverse: true,   // 100 בראשית הציר (שמאל), 65 בסוף (ימין)
           ticks:{
             color:'#64748b',
             stepSize: 5,
             callback: v => `${v} ק"ג`,
-          },
-          grid:{ color:'#e2e8f0' },
-        },
-        y: {
-          ticks:{
-            color:'#64748b', font:{size:10},
-            autoSkip: false,
-            maxTicksLimit: 31,
-            padding: 2,
-            callback: (val, idx) => activePeriod === 0 ? labels[idx] : val,
           },
           grid:{ color:'#e2e8f0' },
         },
