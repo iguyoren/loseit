@@ -297,9 +297,9 @@ async function renderChart() {
     wks.forEach(w => { workoutsByUser[u.phone][w.recorded_at.slice(0,10)] = w.type; });
   }));
 
-  // גובה גרף סטנדרטי (לא תלוי במספר ימים)
+  // גובה גרף — מרווח נדיב כדי שכל קילו יקבל שורה נושמת
   const canvas = document.getElementById('weightChart');
-  const chartH = 380;
+  const chartH = 560;
   canvas.style.height = chartH + 'px';
   canvas.style.minHeight = chartH + 'px';
   const wrapper = canvas.parentElement;
@@ -360,11 +360,11 @@ async function renderChart() {
 
   if (chart) chart.destroy();
 
-  // טווח ציר Y דינמי: משקל נוכחי ±15 ק"ג
+  // טווח ציר Y דינמי: משקל נוכחי ±10 ק"ג
   const refEntries = calPhone ? allEntries.filter(e => e.user_phone === calPhone) : allEntries;
   const currentWeight = refEntries.length ? refEntries[0].weight : 80;
-  const yMin = Math.floor(currentWeight) - 15;
-  const yMax = Math.ceil(currentWeight) + 15;
+  const yMin = Math.floor(currentWeight) - 10;
+  const yMax = Math.ceil(currentWeight) + 10;
 
   chart = new Chart(ctx, {
     type: 'line',
