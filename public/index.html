@@ -9,13 +9,105 @@
 </head>
 <body>
 
+<!-- מסך סיסמה -->
+<div id="passwordScreen" style="
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  position:fixed; inset:0; z-index:9999;
+  background: linear-gradient(135deg, #f0f2f8 0%, #e8eaf6 50%, #fce4ec 100%);">
+  <div style="
+    background:rgba(255,255,255,.92); backdrop-filter:blur(20px);
+    border:1px solid rgba(255,255,255,.8);
+    border-radius:24px; padding:44px 36px;
+    box-shadow:0 8px 32px rgba(99,102,241,.15), 0 32px 64px rgba(0,0,0,.1);
+    text-align:center; width:320px;">
+    <div style="font-size:3rem; margin-bottom:8px; line-height:1;">⚖️</div>
+    <h2 style="margin:0 0 4px; font-size:1.6rem; font-weight:800; color:#0f172a; letter-spacing:-.03em;">LoseIt</h2>
+    <p style="margin:0 0 28px; color:#64748b; font-size:.88rem;">הכנס סיסמה להמשך</p>
+    <input id="passwordInput" type="password" placeholder="••••••" autofocus
+      style="width:100%; padding:13px 16px; border:2px solid #e4e8f0; border-radius:12px;
+             font-size:1.3rem; text-align:center; outline:none; box-sizing:border-box;
+             transition:border-color .2s, box-shadow .2s; letter-spacing:.2em;
+             font-family:inherit; background:#f8fafc; color:#0f172a;" />
+    <p id="passwordError" style="color:#f43f5e; font-size:.83rem; margin:8px 0 0; min-height:1.2em; font-weight:500;"></p>
+    <button id="passwordBtn" style="
+      margin-top:14px; width:100%; padding:13px;
+      background:linear-gradient(135deg,#6366f1,#4f46e5);
+      color:#fff; border:none; border-radius:12px;
+      font-size:1rem; cursor:pointer; font-weight:700;
+      box-shadow:0 4px 16px rgba(99,102,241,.4);
+      transition:all .2s; letter-spacing:.01em;">
+      כניסה לאתר
+    </button>
+  </div>
+</div>
+
+<script>
+(function() {
+  var PASSWORDS = {
+    '260487':  'גיא',
+    '190287':  'שמחה',
+    '151198':  'גלגל',
+    '200196':  'אוריה',
+    '260261':  'שלי',
+  };
+  var BLOCKED_USERS = {
+    'גלגל': 'עקב חוסר שיתוף פעולה חשבונך נחסם',
+  };
+  var KEY = 'loseit_auth';
+  var KEY_USER = 'loseit_user';
+  var screen = document.getElementById('passwordScreen');
+
+  // אם כבר מאומת בסשן — הסתר מיד
+  if (sessionStorage.getItem(KEY) === '1') {
+    screen.style.display = 'none';
+    return;
+  }
+
+  function tryLogin() {
+    var val = document.getElementById('passwordInput').value.trim();
+    var userName = PASSWORDS[val];
+    if (userName) {
+      // בדוק אם המשתמש חסום
+      if (BLOCKED_USERS[userName]) {
+        document.getElementById('passwordError').textContent = BLOCKED_USERS[userName];
+        document.getElementById('passwordInput').value = '';
+        document.getElementById('passwordInput').focus();
+        return;
+      }
+      sessionStorage.setItem(KEY, '1');
+      sessionStorage.setItem(KEY_USER, userName);
+      screen.style.display = 'none';
+      // תיעוד כניסה לשרת
+      fetch('/api/log-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_name: userName })
+      }).catch(function(){});
+    } else {
+      document.getElementById('passwordError').textContent = 'סיסמה שגויה, נסה שוב';
+      document.getElementById('passwordInput').value = '';
+      document.getElementById('passwordInput').focus();
+    }
+  }
+
+  document.getElementById('passwordBtn').addEventListener('click', tryLogin);
+  document.getElementById('passwordInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') tryLogin();
+    document.getElementById('passwordError').textContent = '';
+  });
+})();
+</script>
+
 <header>
   <div class="header-inner">
     <div class="logo">⚖️ <span>LoseIt</span></div>
     <nav class="desktop-nav">
-      <button class="nav-btn active" data-view="dashboard">🏠 דשבורד</button>
-      <button class="nav-btn" data-view="calendar">📅 לוח שנה</button>
-      <button class="nav-btn" data-view="history">📋 היסטוריה</button>
+      <button class="nav-btn active" data-view="dashboard"><span class="nav-icon">🏠</span><span class="nav-label"> דשבורד</span></button>
+      <button class="nav-btn" data-view="calendar"><span class="nav-icon">📅</span><span class="nav-label"> לוח שנה</span></button>
+      <button class="nav-btn" data-view="history"><span class="nav-icon">📋</span><span class="nav-label"> היסטוריה</span></button>
+      <button class="nav-btn" data-view="diary"><span class="nav-icon">📷</span><span class="nav-label"> יומן אכילה</span></button>
+      <button class="nav-btn" data-view="steps" id="stepsNavBtn" style="display:none"><span class="nav-icon">👟</span><span class="nav-label"> צעדים</span></button>
+      <button class="nav-btn" data-view="logs"><span class="nav-icon">🔍</span><span class="nav-label"> לוגים</span></button>
     </nav>
   </div>
 </header>
@@ -33,6 +125,18 @@
   <button class="mob-nav-btn" data-view="history">
     <span class="mob-icon">📋</span>
     <span class="mob-label">היסטוריה</span>
+  </button>
+  <button class="mob-nav-btn" data-view="diary">
+    <span class="mob-icon">📷</span>
+    <span class="mob-label">יומן</span>
+  </button>
+  <button class="mob-nav-btn" data-view="steps" id="stepsMobBtn" style="display:none">
+    <span class="mob-icon">👟</span>
+    <span class="mob-label">צעדים</span>
+  </button>
+  <button class="mob-nav-btn" data-view="logs">
+    <span class="mob-icon">🔍</span>
+    <span class="mob-label">לוגים</span>
   </button>
 </nav>
 
@@ -64,6 +168,9 @@
         <div id="workoutRow" class="workout-row"></div>
       </div>
     </section>
+
+    <!-- Steps widget -->
+    <section id="stepsWidget" class="card" style="display:none"></section>
 
     <!-- Manual entry -->
     <section class="card">
@@ -101,12 +208,46 @@
     </div>
   </div>
 
+  <!-- ═══ FOOD DIARY ═══ -->
+  <div id="view-diary" class="view">
+    <div class="diary-toolbar">
+      <div id="diaryUserSwitcher" class="user-switcher small"></div>
+    </div>
+    <div id="diaryContent"></div>
+  </div>
+
+  <!-- ═══ STEPS (גיא בלבד) ═══ -->
+  <div id="view-steps" class="view">
+    <div class="card" id="stepsToday">
+      <div class="card-header">
+        <h2>👟 צעדים היום — גיא</h2>
+        <button class="btn-secondary" onclick="refreshSteps()" id="btnRefreshSteps" style="font-size:.78rem;padding:5px 12px">🔄 רענן</button>
+      </div>
+      <div id="stepsTodayBody"><p class="empty-state">טוען...</p></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>📊 30 ימים אחרונים</h2></div>
+      <div id="stepsHistory"></div>
+    </div>
+  </div>
+
+  <!-- ═══ LOGS ═══ -->
+  <div id="view-logs" class="view">
+    <div class="card">
+      <div class="card-header">
+        <h2>🔍 לוגי כניסות לאתר</h2>
+        <button class="btn-secondary" onclick="clearLogs()" style="font-size:.8rem;padding:6px 14px">🗑️ נקה לוגים</button>
+      </div>
+      <div id="logsTable"></div>
+    </div>
+  </div>
+
   <!-- ═══ HISTORY ═══ -->
   <div id="view-history" class="view">
     <div class="card">
       <div class="card-header">
-        <h2>📋 היסטוריית משקל</h2>
-        <select id="filterUser"><option value="">כולם</option></select>
+        <h2>📋 היסטוריית נתונים</h2>
+        <div id="filterUserBtns" class="filter-user-btns"></div>
       </div>
       <div id="historyTable"></div>
     </div>
@@ -116,22 +257,81 @@
 
 <!-- ═══ FOOD EDIT MODAL ═══ -->
 <div id="foodModal" class="modal-overlay hidden">
-  <div class="modal">
+  <div class="modal modal-wide">
     <div class="modal-header">
       <h3>✏️ עריכת ארוחה</h3>
       <button onclick="closeFoodModal()" class="btn-close">✕</button>
     </div>
     <div class="modal-body">
-      <label>תיאור האוכל</label>
-      <textarea id="foodEditDesc" rows="3"></textarea>
-      <label>קלוריות</label>
-      <input type="number" id="foodEditCal" min="0" max="9999" />
+      <div class="food-items-header">
+        <span>פריט</span>
+        <span>קלוריות</span>
+        <span></span>
+      </div>
+      <div id="foodItemsList"></div>
+      <button onclick="addFoodItem()" class="btn-add-item">+ הוסף פריט</button>
+      <div class="food-total-row">
+        סה"כ: <strong id="foodTotalCalc">0</strong> קלוריות
+      </div>
     </div>
     <div class="modal-footer">
       <button onclick="closeFoodModal()" class="btn-secondary">ביטול</button>
       <button onclick="saveFoodEdit()" class="btn-primary">שמור</button>
     </div>
   </div>
+</div>
+
+<!-- ═══ ADD FOOD MODAL ═══ -->
+<div id="addFoodModal" class="modal-overlay hidden">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h3>🍽️ הוספת ארוחה — <span id="addFoodDateTitle"></span></h3>
+      <button onclick="closeAddFoodModal()" class="btn-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="food-items-header">
+        <span>פריט</span>
+        <span>קלוריות</span>
+        <span></span>
+      </div>
+      <div id="addFoodItemsList"></div>
+      <button onclick="addFoodItem()" class="btn-add-item">+ הוסף פריט</button>
+      <div class="food-total-row">
+        סה"כ: <strong id="addFoodTotalCalc">0</strong> קלוריות
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeAddFoodModal()" class="btn-secondary">ביטול</button>
+      <button onclick="saveAddFood()" class="btn-primary">הוסף</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ WEIGHT EDIT MODAL ═══ -->
+<div id="weightModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>✏️ עריכת משקל</h3>
+      <button onclick="closeWeightModal()" class="btn-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <label>משקל (ק"ג)</label>
+      <input type="number" id="weightEditVal" step="0.1" min="30" max="300" />
+      <label>הערה</label>
+      <input type="text" id="weightEditNote" placeholder="הערה (אופציונלי)" />
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeWeightModal()" class="btn-secondary">ביטול</button>
+      <button onclick="saveWeightEdit()" class="btn-primary">שמור</button>
+    </div>
+  </div>
+</div>
+
+<!-- Photo Lightbox -->
+<div id="photoLightbox" class="lightbox hidden" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightboxImg" src="" alt="" onclick="event.stopPropagation()" />
+  <div id="lightboxCaption"></div>
 </div>
 
 <div id="toast"></div>

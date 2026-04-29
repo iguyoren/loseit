@@ -49,7 +49,7 @@ function startWhatsAppClient(targetGroupName) {
     }
   });
 
-  client.on('message_create', async msg => {
+  async function handleMsg(msg) {
     let chat;
     try { chat = await msg.getChat(); } catch { return; }
     if (!chat.isGroup) return;
@@ -94,10 +94,43 @@ function startWhatsAppClient(targetGroupName) {
         await msg.reply(`🍽️ ארוחה נרשמה!\n${lines}\n\n🔥 סה"כ: ~${total} קלוריות`);
       }
     }
+  }
+
+  client.on('message',        handleMsg);  // הודעות נכנסות מאחרים
+  client.on('message_create', handleMsg);  // הודעות שנשלחות מהטלפון שלנו
+
+  // Keepalive — בודק כל דקה שהחיבור עדיין פעיל
+  const keepalive = setInterval(async () => {
+    try {
+      const state = await client.getState();
+      if (state !== 'CONNECTED') {
+        console.log(`🔄 מצב: ${state} — מתחבר מחדש...`);
+        isReady = false;
+        clearInterval(keepalive);
+        startWhatsAppClient(targetGroupName);
+      }
+    } catch {
+      console.log('🔄 keepalive נכשל — מתחבר מחדש...');
+      isReady = false;
+      clearInterval(keepalive);
+      startWhatsAppClient(targetGroupName);
+    }
+  }, 60_000);
+
+  client.on('auth_failure', () => {
+    console.error('❌ אימות נכשל — מנסה מחדש בעוד 10 שניות');
+    isReady = false;
+    setTimeout(() => startWhatsAppClient(targetGroupName), 10_000);
   });
 
-  client.on('auth_failure', () => console.error('❌ אימות נכשל'));
-  client.on('disconnected', r => { isReady=false; console.log('⚠️  התנתק:', r); });
+  client.on('disconnected', reason => {
+    isReady = false;
+    console.log('⚠️  התנתק:', reason, '— מתחבר מחדש בעוד 5 שניות...');
+    setTimeout(() => {
+      try { client.initialize(); } catch {}
+    }, 5_000);
+  });
+
   client.initialize();
   return client;
 }

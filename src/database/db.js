@@ -17,6 +17,20 @@ function getDb() {
 }
 
 async function init() {
+  // Neon DB "נרדם" אחרי חוסר פעילות — מנסים עד 3 פעמים עם השהייה
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await _initOnce();
+    } catch (err) {
+      if (attempt === MAX_RETRIES) throw err;
+      console.warn(`[DB] ניסיון ${attempt} נכשל, מנסה שוב...`);
+      await new Promise(r => setTimeout(r, 1000 * attempt));
+    }
+  }
+}
+
+async function _initOnce() {
   const sql = getDb();
   await sql.query(`CREATE TABLE IF NOT EXISTS users (
     id            SERIAL PRIMARY KEY,
@@ -49,6 +63,34 @@ async function init() {
     description TEXT NOT NULL,
     calories    INTEGER,
     raw_message TEXT,
+    recorded_at TEXT NOT NULL,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+  )`);
+  await sql.query(`CREATE TABLE IF NOT EXISTS access_logs (
+    id         SERIAL PRIMARY KEY,
+    ip         TEXT,
+    user_agent TEXT,
+    path       TEXT,
+    user_name  TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
+  // הוסף עמודת user_name אם לא קיימת (מיגרציה)
+  await sql.query(`ALTER TABLE access_logs ADD COLUMN IF NOT EXISTS user_name TEXT`);
+  await sql.query(`CREATE TABLE IF NOT EXISTS daily_steps (
+    id          SERIAL PRIMARY KEY,
+    user_phone  TEXT NOT NULL,
+    date        TEXT NOT NULL,
+    steps       INTEGER NOT NULL DEFAULT 0,
+    distance_km REAL,
+    calories    INTEGER,
+    UNIQUE(user_phone, date)
+  )`);
+  await sql.query(`CREATE TABLE IF NOT EXISTS food_photos (
+    id          SERIAL PRIMARY KEY,
+    user_phone  TEXT NOT NULL,
+    image_data  TEXT NOT NULL,
+    mime_type   TEXT DEFAULT 'image/jpeg',
+    caption     TEXT,
     recorded_at TEXT NOT NULL,
     created_at  TIMESTAMPTZ DEFAULT NOW()
   )`);

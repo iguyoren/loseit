@@ -1,37 +1,64 @@
 const WEIGHT_PATTERN = /(\d{2,3}[.,]\d{1,2}|\d{2,3})\s*(?:קג|ק"ג|ק'ג|קילו|קילוגרם|kg)?/i;
 const TARGET_PATTERN = /(?:מטרה|יעד|target)[:\s]+(\d{2,3}[.,]?\d{0,2})/i;
 
+// Short prefix aliases:
+//   מ:  → weight if content is numeric, else food
+//   ס:  → workout (ספורט)
 function parseMessage(text) {
   if (!text || typeof text !== 'string') return null;
   const trimmed = text.trim();
 
-  // Detect prefix type
+  // Pure numeric message (e.g. "85", "85.5", "85,5") → weight
+  // אם המשתמש שלח רק מספר ללא טקסט נוסף — נניח שזה משקל
+  const pureNumber = trimmed.replace(/\s+/g, '').replace(',', '.');
+  if (/^\d{1,3}(\.\d{1,2})?$/.test(pureNumber)) {
+    const w = parseFloat(pureNumber);
+    if (isValidWeight(w)) return { type: 'weight', weight: w, note: null };
+  }
+
+  // Full prefixes
   const weightPrefix  = /^(?:משקל|weight)\s*[:：]\s*/i;
-  const workoutPrefix = /^(?:אימון|workout|אמרן)\s*[:：]\s*/i;
+  const workoutPrefix = /^(?:אימון|workout|אמרן|ספורט)\s*[:：]\s*/i;
   const foodPrefix    = /^(?:אכול|אכלתי|אכילה|food|ארוחה)\s*[:：]\s*/i;
   const targetPrefix  = /^(?:מטרה|יעד|target)\s*[:：]\s*/i;
 
+  // Short aliases
+  const shortWeight  = /^מ\s*[:：]\s*/;   // מ: → weight (if numeric)
+  const shortWorkout = /^ס\s*[:：]\s*/;   // ס: → workout (ספורט)
+  const shortFood    = /^א\s*[:：]\s*/;   // א: → food (אוכל)
+
   if (weightPrefix.test(trimmed)) {
-    const body = trimmed.replace(weightPrefix, '').trim();
-    return parseWeightValue(body, 'weight');
+    return parseWeightValue(trimmed.replace(weightPrefix, '').trim(), 'weight');
   }
-
   if (workoutPrefix.test(trimmed)) {
-    const body = trimmed.replace(workoutPrefix, '').trim();
-    return { type: 'workout', text: body };
+    return { type: 'workout', text: trimmed.replace(workoutPrefix, '').trim() };
+  }
+  if (foodPrefix.test(trimmed)) {
+    return { type: 'food', text: trimmed.replace(foodPrefix, '').trim() };
+  }
+  if (targetPrefix.test(trimmed)) {
+    return parseWeightValue(trimmed.replace(targetPrefix, '').trim(), 'target');
   }
 
-  if (foodPrefix.test(trimmed)) {
-    const body = trimmed.replace(foodPrefix, '').trim();
+  // Short aliases
+  if (shortWorkout.test(trimmed)) {
+    const body = trimmed.replace(shortWorkout, '').trim();
+    return { type: 'workout', text: body || 'ספורט' };
+  }
+  if (shortFood.test(trimmed)) {
+    const body = trimmed.replace(shortFood, '').trim();
+    return { type: 'food', text: body };
+  }
+  if (shortWeight.test(trimmed)) {
+    const body = trimmed.replace(shortWeight, '').trim();
+    // If body starts with a number → weight; otherwise → food
+    if (WEIGHT_PATTERN.test(body) && /^\d/.test(body)) {
+      return parseWeightValue(body, 'weight');
+    }
     return { type: 'food', text: body };
   }
 
-  if (targetPrefix.test(trimmed)) {
-    const body = trimmed.replace(targetPrefix, '').trim();
-    return parseWeightValue(body, 'target');
-  }
-
-  // No prefix — try to detect weight (legacy support)
+  // No prefix — try to detect weight from plain number (legacy support)
   return parseWeightValue(trimmed, 'weight');
 }
 

@@ -1,12 +1,26 @@
 {
   "version": 2,
   "builds": [
-    { "src": "server.js", "use": "@vercel/node" }
+    { "src": "server.js", "use": "@vercel/node", "config": { "maxDuration": 60 } }
   ],
   "routes": [
     { "src": "/(.*)", "dest": "/server.js" }
   ],
   "env": {
     "NODE_ENV": "production"
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/morning-reminder",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/evening-reminder",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/sync-garmin",
+      "schedule": "0 21 * * *"
+    }
+  ]
 }
